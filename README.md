@@ -44,11 +44,12 @@ vendor/bin/wp-pest init --target=plugin
 Run the generated code and browser tests with:
 
 ```bash
-vendor/bin/wp-pest run --tests=code
-vendor/bin/wp-pest run --tests=browser
+vendor/bin/pest
+vendor/bin/pest --testsuite=Code
+vendor/bin/pest --testsuite=Browser
 ```
 
-When code tests are run through `vendor/bin/wp-pest run`, WordPress is bootstrapped before the tests execute.
+The generated `tests/Pest.php` bootstraps WordPress before the tests execute.
 The generated browser tests assert that the page source includes a document body and that there are no JavaScript errors.
 
 ## Configuration
@@ -85,7 +86,9 @@ return [
 
 ```bash
 vendor/bin/wp-pest doctor
-vendor/bin/wp-pest run
+vendor/bin/pest
+vendor/bin/pest --testsuite=Code
+vendor/bin/pest --testsuite=Browser
 vendor/bin/wp-pest run --matrix=all
 vendor/bin/wp-pest sandbox:start php83-wp-latest
 vendor/bin/wp-pest sandbox:reset php83-wp-latest

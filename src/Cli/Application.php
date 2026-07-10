@@ -52,6 +52,7 @@ final class Application
 
         $config = $workingDirectory.DIRECTORY_SEPARATOR.'wp-pest.php';
         $pest = $workingDirectory.DIRECTORY_SEPARATOR.'tests'.DIRECTORY_SEPARATOR.'Pest.php';
+        $phpunit = $workingDirectory.DIRECTORY_SEPARATOR.'phpunit.xml.dist';
         $gitignore = $workingDirectory.DIRECTORY_SEPARATOR.'.gitignore';
 
         if (! is_file($config)) {
@@ -64,8 +65,13 @@ final class Application
         }
 
         if (! is_file($pest)) {
-            file_put_contents($pest, "<?php\n\ndeclare(strict_types=1);\n\nuses()->beforeEach(function (): void {\n    // Project-specific Pest setup can go here.\n});\n");
+            file_put_contents($pest, file_get_contents(__DIR__.'/../../examples/tests/Pest.php'));
             echo "Created tests/Pest.php\n";
+        }
+
+        if (! is_file($phpunit) && ! is_file($workingDirectory.DIRECTORY_SEPARATOR.'phpunit.xml')) {
+            file_put_contents($phpunit, file_get_contents(__DIR__.'/../../examples/phpunit.xml.dist'));
+            echo "Created phpunit.xml.dist\n";
         }
 
         $this->copyExampleTests($workingDirectory, $target);
