@@ -19,7 +19,7 @@ That supports these common runs:
 ## Install
 
 ```bash
-composer require --dev crosspeak/wp-pest pestphp/pest
+composer require --dev crosspeak/wp-pest
 composer require --dev pestphp/pest-plugin-browser # for browser tests
 vendor/bin/wp-pest init
 ```
