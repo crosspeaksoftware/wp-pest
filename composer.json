@@ -8,7 +8,8 @@
     "pestphp/pest": "^4.0"
   },
   "require-dev": {
-    "laravel/pint": "^1.29"
+    "laravel/pint": "^1.29",
+    "phpstan/phpstan": "^2.1"
   },
   "suggest": {
     "pestphp/pest-plugin-browser": "Required when running browser tests."
@@ -30,6 +31,7 @@
     "bin/wp-pest"
   ],
   "scripts": {
+    "analyse": "phpstan analyse",
     "test": "pest",
     "format": "pint"
   },

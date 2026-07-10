@@ -95,7 +95,7 @@ final class SandboxManager
     {
         $matrix = $this->config->sandboxMatrix();
 
-        if (! isset($matrix[$name]) || ! is_array($matrix[$name])) {
+        if (! isset($matrix[$name])) {
             throw new ValidationException(["Unknown sandbox matrix entry: {$name}."]);
         }
 
