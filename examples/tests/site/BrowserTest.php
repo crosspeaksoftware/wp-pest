@@ -2,5 +2,6 @@
 
 it('loads the home page', function () {
     visit(wp_pest()->url())
-        ->assertNoSmoke();
+        ->assertSourceHas('<body')
+        ->assertNoJavaScriptErrors();
 });

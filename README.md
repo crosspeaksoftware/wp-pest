@@ -49,6 +49,7 @@ vendor/bin/wp-pest run --tests=browser
 ```
 
 When code tests are run through `vendor/bin/wp-pest run`, WordPress is bootstrapped before the tests execute.
+The generated browser tests assert that the page source includes a document body and that there are no JavaScript errors.
 
 ## Configuration
 
