@@ -1,0 +1,16 @@
+<?xml version="1.0" ?>
+<ruleset
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    name="Laravel"
+    xsi:noNamespaceSchemaLocation="phpcs.xsd"
+>
+    <description
+    >Laravel - pint is used for actual formatting with Laravel style. This uses PSR12 with some modifications since it is close enough for linting.</description>
+    <rule ref="PSR12">
+        <exclude name="PSR12.Operators.OperatorSpacing.NoSpaceBefore" />
+        <exclude name="PSR12.Operators.OperatorSpacing.NoSpaceAfter" />
+        <exclude name="Generic.Files.LineLength.TooLong" />
+        <exclude name="PSR12.Traits.UseDeclaration.MultipleImport" />
+        <exclude name="PSR12.Classes.ClassInstantiation.MissingParentheses" />
+    </rule>
+</ruleset>
