@@ -31,9 +31,10 @@
     "bin/wp-pest"
   ],
   "scripts": {
-    "analyse": "phpstan analyse",
-    "test": "pest",
-    "format": "pint"
+    "analyse": "./vendor/bin/phpstan analyse",
+    "test": "./vendor/bin/pest",
+    "format": "./vendor/bin/pint",
+    "format:test": "./vendor/bin/pint --test"
   },
   "extra": {
     "pest": {
