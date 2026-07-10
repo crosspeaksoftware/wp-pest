@@ -1,0 +1,49 @@
+{
+  "name": "crosspeak/wp-pest",
+  "description": "Pest plugin and tooling for testing WordPress sites and plugins.",
+  "type": "library",
+  "license": "MIT",
+  "require": {
+    "php": "^8.2"
+  },
+  "require-dev": {
+    "pestphp/pest": "^4.0"
+  },
+  "suggest": {
+    "pestphp/pest-plugin-browser": "Required when running browser tests."
+  },
+  "autoload": {
+    "psr-4": {
+      "CrossPeak\\WpPest\\": "src/"
+    },
+    "files": [
+      "src/Runtime/functions.php"
+    ]
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Tests\\": "tests/"
+    }
+  },
+  "bin": [
+    "bin/wp-pest"
+  ],
+  "scripts": {
+    "test": "pest"
+  },
+  "extra": {
+    "pest": {
+      "plugins": [
+        "CrossPeak\\WpPest\\PestPlugin"
+      ]
+    }
+  },
+  "config": {
+    "allow-plugins": {
+      "pestphp/pest-plugin": true
+    },
+    "sort-packages": true
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true
+}

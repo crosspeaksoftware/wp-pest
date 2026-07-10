@@ -1,0 +1,4 @@
+.wp-pest/
+.phpunit.cache/
+vendor/
+composer.lock
