@@ -65,11 +65,8 @@ final class Application
             echo "Created tests/Pest.php\n";
         }
 
-        $ignore = ".wp-pest/\n";
-        if (! is_file($gitignore) || ! str_contains((string) file_get_contents($gitignore), $ignore)) {
-            file_put_contents($gitignore, $ignore, FILE_APPEND);
-            echo "Updated .gitignore\n";
-        }
+        $this->copyExampleTests($workingDirectory, $target);
+        $this->appendGitignore($gitignore, [".wp-pest/\n", "tests/Browser/Screenshots/\n"]);
 
         return 0;
     }
@@ -130,6 +127,8 @@ final class Application
             $fixture = (new PluginFixture($config, $workingDirectory))->ensure();
             putenv("WP_PEST_WORDPRESS_PATH={$fixture}/wordpress");
         }
+
+        putenv('WP_PEST_AUTO_BOOTSTRAP_WORDPRESS='.($config->hasCodeTests() ? '1' : '0'));
 
         $matrix = $this->option($arguments, 'matrix') ?? getenv('WP_PEST_MATRIX') ?: null;
 
@@ -204,6 +203,56 @@ final class Application
     private function initTemplate(string $target): string
     {
         return __DIR__."/../../examples/wp-pest.{$target}.php";
+    }
+
+    private function copyExampleTests(string $workingDirectory, string $target): void
+    {
+        $examples = [
+            'code' => [
+                __DIR__."/../../examples/tests/{$target}/CodeTest.php",
+                $workingDirectory.DIRECTORY_SEPARATOR.'tests'.DIRECTORY_SEPARATOR.'Code'.DIRECTORY_SEPARATOR.ucfirst($target).'Test.php',
+            ],
+            'browser' => [
+                __DIR__."/../../examples/tests/{$target}/BrowserTest.php",
+                $workingDirectory.DIRECTORY_SEPARATOR.'tests'.DIRECTORY_SEPARATOR.'Browser'.DIRECTORY_SEPARATOR.ucfirst($target).'Test.php',
+            ],
+        ];
+
+        foreach ($examples as [$source, $destination]) {
+            if (is_file($destination)) {
+                continue;
+            }
+
+            if (! is_dir(dirname($destination))) {
+                mkdir(dirname($destination), 0775, true);
+            }
+
+            copy($source, $destination);
+            echo 'Created '.str_replace($workingDirectory.DIRECTORY_SEPARATOR, '', $destination).PHP_EOL;
+        }
+    }
+
+    /**
+     * @param  list<string>  $entries
+     */
+    private function appendGitignore(string $gitignore, array $entries): void
+    {
+        $contents = is_file($gitignore) ? (string) file_get_contents($gitignore) : '';
+        $updated = false;
+
+        foreach ($entries as $entry) {
+            if (str_contains($contents, $entry)) {
+                continue;
+            }
+
+            $contents .= $entry;
+            $updated = true;
+        }
+
+        if ($updated) {
+            file_put_contents($gitignore, $contents);
+            echo "Updated .gitignore\n";
+        }
     }
 
     /**

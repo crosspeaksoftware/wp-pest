@@ -36,6 +36,20 @@ Use plugin mode when installing into a plugin repository:
 vendor/bin/wp-pest init --target=plugin
 ```
 
+`init` creates example tests for the selected target:
+
+- `tests/Code/SiteTest.php` and `tests/Browser/SiteTest.php` for site mode.
+- `tests/Code/PluginTest.php` and `tests/Browser/PluginTest.php` for plugin mode.
+
+Run the generated code and browser tests with:
+
+```bash
+vendor/bin/wp-pest run --tests=code
+vendor/bin/wp-pest run --tests=browser
+```
+
+When code tests are run through `vendor/bin/wp-pest run`, WordPress is bootstrapped before the tests execute.
+
 ## Configuration
 
 Create `wp-pest.php` in the project root:
@@ -87,7 +101,7 @@ wp_pest()->url();
 wp_pest()->wordpressPath();
 wp_pest()->pluginPath();
 wp_pest()->sandbox();
-wp_pest()->bootstrapWordPress();
+wp_pest()->bootstrapWordPress(); // manual fallback for custom runners
 ```
 
 ## CI overrides
