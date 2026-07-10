@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Tests;
 
+use FilesystemIterator;
 use PHPUnit\Framework\TestCase as BaseTestCase;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
-use FilesystemIterator;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -17,7 +17,7 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
 
-        $this->workspace = sys_get_temp_dir() . '/wp-pest-test-' . bin2hex(random_bytes(6));
+        $this->workspace = sys_get_temp_dir().'/wp-pest-test-'.bin2hex(random_bytes(6));
         mkdir($this->workspace, 0775, true);
     }
 

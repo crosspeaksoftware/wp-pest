@@ -13,9 +13,8 @@ final class SandboxManager
     public function __construct(
         private readonly Config $config,
         private readonly string $workingDirectory,
-        private readonly Process $process = new Process(),
-    ) {
-    }
+        private readonly Process $process = new Process,
+    ) {}
 
     /**
      * @return list<string>
@@ -48,7 +47,7 @@ final class SandboxManager
             mkdir($directory, 0775, true);
         }
 
-        $path = $directory . DIRECTORY_SEPARATOR . 'compose.yml';
+        $path = $directory.DIRECTORY_SEPARATOR.'compose.yml';
         file_put_contents($path, $this->composeYaml($entry));
 
         return $path;
@@ -104,12 +103,12 @@ final class SandboxManager
     }
 
     /**
-     * @param list<string> $arguments
+     * @param  list<string>  $arguments
      */
     private function compose(string $name, array $arguments): int
     {
-        $compose = $this->sandboxDirectory($name) . DIRECTORY_SEPARATOR . 'compose.yml';
-        $project = 'wp-pest-' . preg_replace('/[^a-z0-9_-]+/i', '-', basename($this->workingDirectory) . '-' . $name);
+        $compose = $this->sandboxDirectory($name).DIRECTORY_SEPARATOR.'compose.yml';
+        $project = 'wp-pest-'.preg_replace('/[^a-z0-9_-]+/i', '-', basename($this->workingDirectory).'-'.$name);
 
         return $this->process->run(array_merge(['docker', 'compose', '-p', $project, '-f', $compose], $arguments), $this->workingDirectory, true);
     }
@@ -118,7 +117,7 @@ final class SandboxManager
     {
         $base = (string) $this->config->get('sandbox.path', '.wp-pest/sandboxes');
 
-        return $this->workingDirectory . DIRECTORY_SEPARATOR . trim($base, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $name;
+        return $this->workingDirectory.DIRECTORY_SEPARATOR.trim($base, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.$name;
     }
 
     private function composeYaml(MatrixEntry $entry): string
@@ -140,7 +139,7 @@ final class SandboxManager
 
         $environment = '';
         foreach ($entry->env() as $key => $value) {
-            $environment .= "      {$key}: " . json_encode($value, JSON_THROW_ON_ERROR) . "\n";
+            $environment .= "      {$key}: ".json_encode($value, JSON_THROW_ON_ERROR)."\n";
         }
 
         return <<<YAML
@@ -197,7 +196,7 @@ YAML;
             return $path;
         }
 
-        return $this->workingDirectory . DIRECTORY_SEPARATOR . $path;
+        return $this->workingDirectory.DIRECTORY_SEPARATOR.$path;
     }
 
     private function setupWordPress(string $name): int
@@ -205,7 +204,7 @@ YAML;
         $url = $this->url($name);
         $script = implode(' && ', [
             'until wp db check --allow-root >/dev/null 2>&1; do sleep 2; done',
-            'wp core install --allow-root --url=' . escapeshellarg($url) . ' --title=' . escapeshellarg('WP Pest') . ' --admin_user=admin --admin_password=password --admin_email=admin@example.test --skip-email || true',
+            'wp core install --allow-root --url='.escapeshellarg($url).' --title='.escapeshellarg('WP Pest').' --admin_user=admin --admin_password=password --admin_email=admin@example.test --skip-email || true',
             'wp plugin activate plugin-under-test --allow-root',
         ]);
 

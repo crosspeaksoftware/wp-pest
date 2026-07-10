@@ -12,13 +12,12 @@ final class PluginFixture
     public function __construct(
         private readonly Config $config,
         private readonly string $workingDirectory,
-        private readonly Process $process = new Process(),
-    ) {
-    }
+        private readonly Process $process = new Process,
+    ) {}
 
     public function path(): string
     {
-        return $this->workingDirectory . DIRECTORY_SEPARATOR . '.wp-pest' . DIRECTORY_SEPARATOR . 'fixtures' . DIRECTORY_SEPARATOR . 'wordpress';
+        return $this->workingDirectory.DIRECTORY_SEPARATOR.'.wp-pest'.DIRECTORY_SEPARATOR.'fixtures'.DIRECTORY_SEPARATOR.'wordpress';
     }
 
     public function ensure(): string
@@ -29,7 +28,7 @@ final class PluginFixture
             mkdir($path, 0775, true);
         }
 
-        $composerJson = $path . DIRECTORY_SEPARATOR . 'composer.json';
+        $composerJson = $path.DIRECTORY_SEPARATOR.'composer.json';
         if (! is_file($composerJson)) {
             file_put_contents($composerJson, json_encode([
                 'repositories' => [
@@ -50,10 +49,10 @@ final class PluginFixture
                         'johnpbloch/wordpress-core-installer' => true,
                     ],
                 ],
-            ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL);
+            ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES).PHP_EOL);
         }
 
-        if (! is_file($path . DIRECTORY_SEPARATOR . 'wordpress' . DIRECTORY_SEPARATOR . 'wp-load.php')) {
+        if (! is_file($path.DIRECTORY_SEPARATOR.'wordpress'.DIRECTORY_SEPARATOR.'wp-load.php')) {
             $this->process->run(['composer', 'install'], $path, true);
         }
 

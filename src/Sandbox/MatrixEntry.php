@@ -7,13 +7,12 @@ namespace CrossPeak\WpPest\Sandbox;
 final class MatrixEntry
 {
     /**
-     * @param array<string, mixed> $values
+     * @param  array<string, mixed>  $values
      */
     public function __construct(
         public readonly string $name,
         private readonly array $values,
-    ) {
-    }
+    ) {}
 
     public function php(): string
     {

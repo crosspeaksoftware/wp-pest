@@ -46,7 +46,7 @@ final class ConfigLoader
 
     public function load(string $workingDirectory): Config
     {
-        $path = rtrim($workingDirectory, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'wp-pest.php';
+        $path = rtrim($workingDirectory, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.'wp-pest.php';
         $userConfig = [];
 
         if (is_file($path)) {
@@ -68,8 +68,8 @@ final class ConfigLoader
     }
 
     /**
-     * @param array<string, mixed> $base
-     * @param array<string, mixed> $override
+     * @param  array<string, mixed>  $base
+     * @param  array<string, mixed>  $override
      * @return array<string, mixed>
      */
     private function merge(array $base, array $override): array
@@ -77,11 +77,13 @@ final class ConfigLoader
         foreach ($override as $key => $value) {
             if ($key === 'matrix' && is_array($value)) {
                 $base[$key] = $value;
+
                 continue;
             }
 
             if (is_array($value) && isset($base[$key]) && is_array($base[$key]) && ! array_is_list($value)) {
                 $base[$key] = $this->merge($base[$key], $value);
+
                 continue;
             }
 
@@ -92,7 +94,7 @@ final class ConfigLoader
     }
 
     /**
-     * @param array<string, mixed> $config
+     * @param  array<string, mixed>  $config
      * @return array<string, mixed>
      */
     private function applyEnvironment(array $config): array
@@ -111,7 +113,7 @@ final class ConfigLoader
     }
 
     /**
-     * @param array<string, mixed> $config
+     * @param  array<string, mixed>  $config
      */
     private function setFromEnv(array &$config, string $key, string $env): void
     {
@@ -137,7 +139,7 @@ final class ConfigLoader
     }
 
     /**
-     * @param array<string, mixed> $config
+     * @param  array<string, mixed>  $config
      */
     private function validate(array $config): void
     {

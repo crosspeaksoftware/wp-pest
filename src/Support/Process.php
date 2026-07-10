@@ -7,7 +7,7 @@ namespace CrossPeak\WpPest\Support;
 final class Process
 {
     /**
-     * @param list<string> $command
+     * @param  list<string>  $command
      */
     public function run(array $command, ?string $cwd = null, bool $passthru = false): int
     {
@@ -34,7 +34,7 @@ final class Process
         }
 
         foreach ($output as $line) {
-            echo $line . PHP_EOL;
+            echo $line.PHP_EOL;
         }
 
         return (int) $exitCode;

@@ -15,13 +15,12 @@ final class WpPest
     public function __construct(
         private readonly Config $config,
         private readonly string $workingDirectory,
-    ) {
-    }
+    ) {}
 
     public static function fromCurrentWorkingDirectory(): self
     {
         return self::$instance ??= new self(
-            (new ConfigLoader())->load(getcwd() ?: '.'),
+            (new ConfigLoader)->load(getcwd() ?: '.'),
             getcwd() ?: '.',
         );
     }
@@ -56,7 +55,7 @@ final class WpPest
         if ($this->target() === 'site') {
             return $this->config->sitePath()
                 ? $this->absolutePath($this->config->sitePath())
-                : (new SiteDetector())->detect($this->workingDirectory);
+                : (new SiteDetector)->detect($this->workingDirectory);
         }
 
         $fixture = getenv('WP_PEST_WORDPRESS_PATH');
@@ -93,7 +92,7 @@ final class WpPest
             return false;
         }
 
-        $wpLoad = rtrim($path, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'wp-load.php';
+        $wpLoad = rtrim($path, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.'wp-load.php';
 
         if (! is_file($wpLoad)) {
             return false;
@@ -110,6 +109,6 @@ final class WpPest
             return $path;
         }
 
-        return $this->workingDirectory . DIRECTORY_SEPARATOR . $path;
+        return $this->workingDirectory.DIRECTORY_SEPARATOR.$path;
     }
 }

@@ -11,13 +11,13 @@ final class SiteDetector
         $directory = realpath($start) ?: $start;
 
         while ($directory !== dirname($directory)) {
-            if (is_file($directory . DIRECTORY_SEPARATOR . 'wp-load.php')) {
+            if (is_file($directory.DIRECTORY_SEPARATOR.'wp-load.php')) {
                 return $directory;
             }
 
             foreach (['web/wp', 'public/wp', 'wordpress', 'wp'] as $candidate) {
-                $path = $directory . DIRECTORY_SEPARATOR . $candidate;
-                if (is_file($path . DIRECTORY_SEPARATOR . 'wp-load.php')) {
+                $path = $directory.DIRECTORY_SEPARATOR.$candidate;
+                if (is_file($path.DIRECTORY_SEPARATOR.'wp-load.php')) {
                     return $path;
                 }
             }

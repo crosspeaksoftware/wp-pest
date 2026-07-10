@@ -9,7 +9,7 @@ use RuntimeException;
 final class ValidationException extends RuntimeException
 {
     /**
-     * @param list<string> $errors
+     * @param  list<string>  $errors
      */
     public function __construct(private readonly array $errors)
     {

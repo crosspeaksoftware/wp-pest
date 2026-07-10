@@ -7,11 +7,9 @@ namespace CrossPeak\WpPest\Config;
 final class Config
 {
     /**
-     * @param array<string, mixed> $values
+     * @param  array<string, mixed>  $values
      */
-    public function __construct(private readonly array $values)
-    {
-    }
+    public function __construct(private readonly array $values) {}
 
     public function target(): string
     {

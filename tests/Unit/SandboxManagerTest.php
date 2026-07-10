@@ -7,7 +7,7 @@ use CrossPeak\WpPest\Config\ValidationException;
 use CrossPeak\WpPest\Sandbox\SandboxManager;
 
 it('selects all matrix entries', function (): void {
-    file_put_contents($this->workspace . '/wp-pest.php', <<<'PHP'
+    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
 <?php
 
 return [
@@ -23,14 +23,14 @@ return [
 ];
 PHP);
 
-    $config = (new ConfigLoader())->load($this->workspace);
+    $config = (new ConfigLoader)->load($this->workspace);
     $manager = new SandboxManager($config, $this->workspace);
 
     expect($manager->matrixNames('all'))->toBe(['php83', 'php84']);
 });
 
 it('rejects unknown matrix entries', function (): void {
-    file_put_contents($this->workspace . '/wp-pest.php', <<<'PHP'
+    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
 <?php
 
 return [
@@ -40,15 +40,15 @@ return [
 ];
 PHP);
 
-    $config = (new ConfigLoader())->load($this->workspace);
+    $config = (new ConfigLoader)->load($this->workspace);
     $manager = new SandboxManager($config, $this->workspace);
 
     $manager->matrixNames('missing');
 })->throws(ValidationException::class, 'Unknown sandbox matrix entry');
 
 it('writes compose files for matrix entries', function (): void {
-    mkdir($this->workspace . '/plugin');
-    file_put_contents($this->workspace . '/wp-pest.php', <<<'PHP'
+    mkdir($this->workspace.'/plugin');
+    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
 <?php
 
 return [
@@ -67,7 +67,7 @@ return [
 ];
 PHP);
 
-    $config = (new ConfigLoader())->load($this->workspace);
+    $config = (new ConfigLoader)->load($this->workspace);
     $manager = new SandboxManager($config, $this->workspace);
     $path = $manager->writeCompose('php83');
 

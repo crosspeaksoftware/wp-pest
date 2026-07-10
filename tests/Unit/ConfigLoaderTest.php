@@ -6,7 +6,7 @@ use CrossPeak\WpPest\Config\ConfigLoader;
 use CrossPeak\WpPest\Config\ValidationException;
 
 it('loads defaults for a site code target', function (): void {
-    $config = (new ConfigLoader())->load($this->workspace);
+    $config = (new ConfigLoader)->load($this->workspace);
 
     expect($config->target())->toBe('site')
         ->and($config->tests())->toBe(['code'])
@@ -15,7 +15,7 @@ it('loads defaults for a site code target', function (): void {
 });
 
 it('loads plugin target with code and browser tests', function (): void {
-    file_put_contents($this->workspace . '/wp-pest.php', <<<'PHP'
+    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
 <?php
 
 return [
@@ -30,7 +30,7 @@ return [
 ];
 PHP);
 
-    $config = (new ConfigLoader())->load($this->workspace);
+    $config = (new ConfigLoader)->load($this->workspace);
 
     expect($config->target())->toBe('plugin')
         ->and($config->tests())->toBe(['code', 'browser'])
@@ -39,7 +39,7 @@ PHP);
 });
 
 it('requires a url for site browser tests', function (): void {
-    file_put_contents($this->workspace . '/wp-pest.php', <<<'PHP'
+    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
 <?php
 
 return [
@@ -48,11 +48,11 @@ return [
 ];
 PHP);
 
-    (new ConfigLoader())->load($this->workspace);
+    (new ConfigLoader)->load($this->workspace);
 })->throws(ValidationException::class, 'site.url is required');
 
 it('requires a plugin path for plugin tests', function (): void {
-    file_put_contents($this->workspace . '/wp-pest.php', <<<'PHP'
+    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
 <?php
 
 return [
@@ -61,7 +61,7 @@ return [
 ];
 PHP);
 
-    (new ConfigLoader())->load($this->workspace);
+    (new ConfigLoader)->load($this->workspace);
 })->throws(ValidationException::class, 'plugin.path is required');
 
 it('applies environment overrides', function (): void {
@@ -70,7 +70,7 @@ it('applies environment overrides', function (): void {
     putenv('WP_PEST_PLUGIN_PATH=plugin-from-env');
 
     try {
-        $config = (new ConfigLoader())->load($this->workspace);
+        $config = (new ConfigLoader)->load($this->workspace);
 
         expect($config->target())->toBe('plugin')
             ->and($config->tests())->toBe(['browser'])

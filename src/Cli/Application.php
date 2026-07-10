@@ -30,7 +30,7 @@ final class Application
                 default => $this->help(),
             };
         } catch (ValidationException $exception) {
-            fwrite(STDERR, $exception->getMessage() . PHP_EOL);
+            fwrite(STDERR, $exception->getMessage().PHP_EOL);
 
             return 1;
         }
@@ -38,12 +38,12 @@ final class Application
 
     private function init(string $workingDirectory): int
     {
-        $config = $workingDirectory . DIRECTORY_SEPARATOR . 'wp-pest.php';
-        $pest = $workingDirectory . DIRECTORY_SEPARATOR . 'tests' . DIRECTORY_SEPARATOR . 'Pest.php';
-        $gitignore = $workingDirectory . DIRECTORY_SEPARATOR . '.gitignore';
+        $config = $workingDirectory.DIRECTORY_SEPARATOR.'wp-pest.php';
+        $pest = $workingDirectory.DIRECTORY_SEPARATOR.'tests'.DIRECTORY_SEPARATOR.'Pest.php';
+        $gitignore = $workingDirectory.DIRECTORY_SEPARATOR.'.gitignore';
 
         if (! is_file($config)) {
-            file_put_contents($config, file_get_contents(__DIR__ . '/../../examples/wp-pest.php'));
+            file_put_contents($config, file_get_contents(__DIR__.'/../../examples/wp-pest.php'));
             echo "Created wp-pest.php\n";
         }
 
@@ -67,10 +67,10 @@ final class Application
 
     private function doctor(string $workingDirectory): int
     {
-        $config = (new ConfigLoader())->load($workingDirectory);
+        $config = (new ConfigLoader)->load($workingDirectory);
         $errors = [];
 
-        if ($config->target() === 'site' && $config->hasCodeTests() && (new SiteDetector())->detect($config->sitePath() ?? $workingDirectory) === null) {
+        if ($config->target() === 'site' && $config->hasCodeTests() && (new SiteDetector)->detect($config->sitePath() ?? $workingDirectory) === null) {
             $errors[] = 'Unable to locate wp-load.php for site code tests.';
         }
 
@@ -100,7 +100,7 @@ final class Application
     }
 
     /**
-     * @param list<string> $arguments
+     * @param  list<string>  $arguments
      */
     private function runPest(string $workingDirectory, array $arguments): int
     {
@@ -115,7 +115,7 @@ final class Application
             putenv("WP_PEST_TESTS={$tests}");
         }
 
-        $config = (new ConfigLoader())->load($workingDirectory);
+        $config = (new ConfigLoader)->load($workingDirectory);
 
         if ($config->target() === 'plugin' && $config->hasCodeTests()) {
             $fixture = (new PluginFixture($config, $workingDirectory))->ensure();
@@ -135,8 +135,8 @@ final class Application
                 }
 
                 putenv("WP_PEST_MATRIX={$name}");
-                putenv('WP_PEST_ACTIVE_URL=' . $manager->url($name));
-                $exitCode = (new Process())->run([$this->pestBinary($workingDirectory)], $workingDirectory, true);
+                putenv('WP_PEST_ACTIVE_URL='.$manager->url($name));
+                $exitCode = (new Process)->run([$this->pestBinary($workingDirectory)], $workingDirectory, true);
                 $manager->stop($name);
 
                 if ($exitCode !== 0) {
@@ -147,12 +147,12 @@ final class Application
             return $exitCode;
         }
 
-        return (new Process())->run(array_merge([$this->pestBinary($workingDirectory)], $arguments), $workingDirectory, true);
+        return (new Process)->run(array_merge([$this->pestBinary($workingDirectory)], $arguments), $workingDirectory, true);
     }
 
     private function sandbox(string $workingDirectory, string $action, ?string $selection): int
     {
-        $config = (new ConfigLoader())->load($workingDirectory);
+        $config = (new ConfigLoader)->load($workingDirectory);
         $manager = new SandboxManager($config, $workingDirectory);
         $exitCode = 0;
 
@@ -177,23 +177,23 @@ final class Application
 
     private function commandExists(string $command): bool
     {
-        exec('command -v ' . escapeshellarg($command), $output, $exitCode);
+        exec('command -v '.escapeshellarg($command), $output, $exitCode);
 
         return $exitCode === 0;
     }
 
     private function pestBinary(string $workingDirectory): string
     {
-        return $workingDirectory . DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR . 'bin' . DIRECTORY_SEPARATOR . 'pest';
+        return $workingDirectory.DIRECTORY_SEPARATOR.'vendor'.DIRECTORY_SEPARATOR.'bin'.DIRECTORY_SEPARATOR.'pest';
     }
 
     private function absolutePath(string $workingDirectory, string $path): string
     {
-        return str_starts_with($path, DIRECTORY_SEPARATOR) ? $path : $workingDirectory . DIRECTORY_SEPARATOR . $path;
+        return str_starts_with($path, DIRECTORY_SEPARATOR) ? $path : $workingDirectory.DIRECTORY_SEPARATOR.$path;
     }
 
     /**
-     * @param list<string> $arguments
+     * @param  list<string>  $arguments
      */
     private function option(array $arguments, string $name): ?string
     {
