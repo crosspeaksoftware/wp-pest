@@ -9,10 +9,13 @@ use CrossPeak\WpPest\Config\ValidationException;
 use CrossPeak\WpPest\Sandbox\PluginFixture;
 use CrossPeak\WpPest\Sandbox\SandboxManager;
 use CrossPeak\WpPest\Support\Process;
+use CrossPeak\WpPest\Support\ProcessRunner;
 use CrossPeak\WpPest\Support\SiteDetector;
 
 final class Application
 {
+    public function __construct(private readonly ProcessRunner $process = new Process) {}
+
     public function run(array $argv): int
     {
         $command = $argv[1] ?? 'help';
@@ -110,8 +113,30 @@ final class Application
      */
     private function runPest(string $workingDirectory, array $arguments): int
     {
+        $environment = $this->captureEnvironment([
+            'WP_PEST_TARGET',
+            'WP_PEST_TESTS',
+            'WP_PEST_WORDPRESS_PATH',
+            'WP_PEST_AUTO_BOOTSTRAP_WORDPRESS',
+            'WP_PEST_MATRIX',
+            'WP_PEST_ACTIVE_URL',
+        ]);
+
+        try {
+            return $this->runPestWithEnvironment($workingDirectory, $arguments);
+        } finally {
+            $this->restoreEnvironment($environment);
+        }
+    }
+
+    /**
+     * @param  list<string>  $arguments
+     */
+    private function runPestWithEnvironment(string $workingDirectory, array $arguments): int
+    {
         $target = $this->option($arguments, 'target');
         $tests = $this->option($arguments, 'tests');
+        $pestArguments = $this->pestArguments($workingDirectory, $arguments, $tests);
 
         if ($target !== null) {
             putenv("WP_PEST_TARGET={$target}");
@@ -144,7 +169,7 @@ final class Application
 
                 putenv("WP_PEST_MATRIX={$name}");
                 putenv('WP_PEST_ACTIVE_URL='.$manager->url($name));
-                $exitCode = (new Process)->run([$this->pestBinary($workingDirectory)], $workingDirectory, true);
+                $exitCode = $this->process->run(array_merge([$this->pestBinary($workingDirectory)], $pestArguments), $workingDirectory, true);
                 $manager->stop($name);
 
                 if ($exitCode !== 0) {
@@ -155,7 +180,7 @@ final class Application
             return $exitCode;
         }
 
-        return (new Process)->run(array_merge([$this->pestBinary($workingDirectory)], $arguments), $workingDirectory, true);
+        return $this->process->run(array_merge([$this->pestBinary($workingDirectory)], $pestArguments), $workingDirectory, true);
     }
 
     private function sandbox(string $workingDirectory, string $action, ?string $selection): int
@@ -267,5 +292,64 @@ final class Application
         }
 
         return null;
+    }
+
+    /**
+     * @param  list<string>  $arguments
+     * @return list<string>
+     */
+    private function pestArguments(string $workingDirectory, array $arguments, ?string $tests): array
+    {
+        $arguments = array_values(array_filter(
+            $arguments,
+            fn (string $argument): bool => ! str_starts_with($argument, '--target=')
+                && ! str_starts_with($argument, '--tests=')
+                && ! str_starts_with($argument, '--matrix=')
+        ));
+
+        if ($tests === null || $tests === '') {
+            return $arguments;
+        }
+
+        $paths = [];
+
+        foreach (array_map('trim', explode(',', $tests)) as $test) {
+            $path = match ($test) {
+                'code' => 'tests/Code',
+                'browser' => 'tests/Browser',
+                default => null,
+            };
+
+            if ($path !== null && is_dir($workingDirectory.DIRECTORY_SEPARATOR.$path)) {
+                $paths[] = $path;
+            }
+        }
+
+        return array_merge($paths, $arguments);
+    }
+
+    /**
+     * @param  list<string>  $names
+     * @return array<string, string|false>
+     */
+    private function captureEnvironment(array $names): array
+    {
+        $environment = [];
+
+        foreach ($names as $name) {
+            $environment[$name] = getenv($name);
+        }
+
+        return $environment;
+    }
+
+    /**
+     * @param  array<string, string|false>  $environment
+     */
+    private function restoreEnvironment(array $environment): void
+    {
+        foreach ($environment as $name => $value) {
+            putenv($value === false ? $name : "{$name}={$value}");
+        }
     }
 }

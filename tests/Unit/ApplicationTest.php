@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use CrossPeak\WpPest\Cli\Application;
+use CrossPeak\WpPest\Support\ProcessRunner;
 
 it('initializes site mode by default', function (): void {
     $previous = getcwd();
@@ -65,3 +66,84 @@ it('rejects invalid init targets', function (): void {
     expect($exitCode)->toBe(1)
         ->and($this->workspace.'/wp-pest.php')->not->toBeFile();
 });
+
+it('runs only code tests when requested', function (): void {
+    prepareRunWorkspace($this->workspace);
+    $process = new RecordingProcess;
+    $previous = getcwd();
+    chdir($this->workspace);
+
+    try {
+        $exitCode = (new Application($process))->run(['wp-pest', 'run', '--tests=code']);
+    } finally {
+        chdir($previous);
+    }
+
+    expect($exitCode)->toBe(0)
+        ->and($process->commands[0])->toBe([$this->workspace.'/vendor/bin/pest', 'tests/Code']);
+});
+
+it('runs only browser tests when requested', function (): void {
+    prepareRunWorkspace($this->workspace);
+    $process = new RecordingProcess;
+    $previous = getcwd();
+    chdir($this->workspace);
+
+    try {
+        $exitCode = (new Application($process))->run(['wp-pest', 'run', '--tests=browser']);
+    } finally {
+        chdir($previous);
+    }
+
+    expect($exitCode)->toBe(0)
+        ->and($process->commands[0])->toBe([$this->workspace.'/vendor/bin/pest', 'tests/Browser']);
+});
+
+it('does not forward wp-pest options to pest', function (): void {
+    prepareRunWorkspace($this->workspace);
+    $process = new RecordingProcess;
+    $previous = getcwd();
+    chdir($this->workspace);
+
+    try {
+        $exitCode = (new Application($process))->run(['wp-pest', 'run', '--target=site', '--tests=code', '--filter=home']);
+    } finally {
+        chdir($previous);
+    }
+
+    expect($exitCode)->toBe(0)
+        ->and($process->commands[0])->toBe([$this->workspace.'/vendor/bin/pest', 'tests/Code', '--filter=home']);
+});
+
+function prepareRunWorkspace(string $workspace): void
+{
+    mkdir($workspace.'/tests/Code', 0775, true);
+    mkdir($workspace.'/tests/Browser', 0775, true);
+    mkdir($workspace.'/vendor/bin', 0775, true);
+    file_put_contents($workspace.'/wp-load.php', '<?php');
+    file_put_contents($workspace.'/vendor/bin/pest', '');
+    file_put_contents($workspace.'/wp-pest.php', <<<'PHP'
+<?php
+
+return [
+    'target' => 'site',
+    'tests' => ['code', 'browser'],
+    'site' => ['url' => 'https://example.test'],
+];
+PHP);
+}
+
+final class RecordingProcess implements ProcessRunner
+{
+    /**
+     * @var list<list<string>>
+     */
+    public array $commands = [];
+
+    public function run(array $command, ?string $cwd = null, bool $passthru = false): int
+    {
+        $this->commands[] = $command;
+
+        return 0;
+    }
+}

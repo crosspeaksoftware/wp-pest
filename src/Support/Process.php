@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace CrossPeak\WpPest\Support;
 
-final class Process
+final class Process implements ProcessRunner
 {
     /**
      * @param  list<string>  $command
