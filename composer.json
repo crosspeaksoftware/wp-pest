@@ -30,7 +30,8 @@
     "bin/wp-pest"
   ],
   "scripts": {
-    "test": "pest"
+    "test": "pest",
+    "format": "pint"
   },
   "extra": {
     "pest": {
