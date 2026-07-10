@@ -24,6 +24,18 @@ composer require --dev pestphp/pest-plugin-browser # for browser tests
 vendor/bin/wp-pest init
 ```
 
+By default, `init` creates a site-mode config for a full WordPress site. You can also be explicit:
+
+```bash
+vendor/bin/wp-pest init --target=site
+```
+
+Use plugin mode when installing into a plugin repository:
+
+```bash
+vendor/bin/wp-pest init --target=plugin
+```
+
 ## Configuration
 
 Create `wp-pest.php` in the project root:
@@ -39,13 +51,13 @@ return [
         'matrix' => [
             'php83-wp-latest' => [
                 'php' => '8.3',
-                'wordpress' => '^6.0',
+                'wordpress' => '^7.0',
                 'database' => 'mariadb:11',
                 'port' => 8080,
             ],
             'php84-wp-latest' => [
                 'php' => '8.4',
-                'wordpress' => '^6.0',
+                'wordpress' => '^7.0',
                 'database' => 'mariadb:11',
                 'port' => 8081,
             ],

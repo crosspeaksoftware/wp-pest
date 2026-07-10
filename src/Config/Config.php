@@ -51,7 +51,7 @@ final class Config
 
     public function wordpressVersion(): string
     {
-        return (string) $this->get('wordpress.version', '^6.0');
+        return (string) $this->get('wordpress.version', '^7.0');
     }
 
     /**

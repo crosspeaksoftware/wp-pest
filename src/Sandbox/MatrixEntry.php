@@ -21,7 +21,7 @@ final class MatrixEntry
 
     public function wordpress(): string
     {
-        return (string) ($this->values['wordpress'] ?? '^6.0');
+        return (string) ($this->values['wordpress'] ?? '^7.0');
     }
 
     public function database(): string

@@ -24,7 +24,7 @@ return [
     'plugin' => ['path' => 'my-plugin'],
     'sandbox' => [
         'matrix' => [
-            'php83' => ['php' => '8.3', 'wordpress' => '^6.0'],
+            'php83' => ['php' => '8.3', 'wordpress' => '^7.0'],
         ],
     ],
 ];

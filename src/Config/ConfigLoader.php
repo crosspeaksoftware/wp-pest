@@ -19,7 +19,7 @@ final class ConfigLoader
                 'path' => null,
             ],
             'wordpress' => [
-                'version' => '^6.0',
+                'version' => '^7.0',
             ],
             'plugin' => [
                 'path' => null,
@@ -32,7 +32,7 @@ final class ConfigLoader
                 'matrix' => [
                     'default' => [
                         'php' => '8.3',
-                        'wordpress' => '^6.0',
+                        'wordpress' => '^7.0',
                         'database' => 'mariadb:11',
                         'theme' => null,
                         'plugins' => [],
