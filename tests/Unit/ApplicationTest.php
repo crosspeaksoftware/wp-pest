@@ -24,6 +24,7 @@ it('initializes site mode by default', function (): void {
         ->and($config)->not->toHaveKeys(['plugin', 'plugins', 'sandbox', 'wordpress'])
         ->and($this->workspace.'/tests/Pest.php')->toBeFile()
         ->and(file_get_contents($this->workspace.'/tests/Pest.php'))->toContain('bootstrapWordPress')
+        ->and(file_get_contents($this->workspace.'/tests/Pest.php'))->toContain('browser()->timeout(60_000)')
         ->and($this->workspace.'/phpunit.xml.dist')->toBeFile()
         ->and(file_get_contents($this->workspace.'/phpunit.xml.dist'))->toContain('<testsuite name="Code">')
         ->and(file_get_contents($this->workspace.'/phpunit.xml.dist'))->toContain('<testsuite name="Browser">')

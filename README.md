@@ -50,6 +50,7 @@ vendor/bin/pest --testsuite=Browser
 ```
 
 The generated `tests/Pest.php` bootstraps WordPress before the tests execute.
+It also increases Pest Browser's default wait timeout from five seconds to one minute.
 The generated browser tests assert that the page source includes a document body and that there are no JavaScript errors.
 
 ## Configuration
