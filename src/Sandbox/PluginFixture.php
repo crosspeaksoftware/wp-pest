@@ -30,22 +30,50 @@ final class PluginFixture
         }
 
         $composerJson = $path.DIRECTORY_SEPARATOR.'composer.json';
+        $repositories = [
+            [
+                'type' => 'composer',
+                'url' => 'https://wpackagist.org',
+            ],
+        ];
+        $requirements = [
+            'roots/wordpress' => $this->config->wordpressVersion(),
+            'wpackagist-plugin/sqlite-database-integration' => '^2.2',
+        ];
+        $installerPaths = [];
+
+        foreach ($this->config->dependencyPlugins() as $dependency) {
+            if ($dependency->isLocalPath()) {
+                continue;
+            }
+
+            $package = $dependency->packageName();
+            $requirements[$package] = $dependency->version();
+            $installerPaths['wordpress/wp-content/plugins/'.$dependency->slug().'/'] = [$package];
+
+            if ($dependency->isUrl()) {
+                $repositories[] = [
+                    'type' => 'package',
+                    'package' => [
+                        'name' => $package,
+                        'version' => $dependency->version(),
+                        'type' => 'wordpress-plugin',
+                        'dist' => [
+                            'url' => $dependency->source(),
+                            'type' => 'zip',
+                        ],
+                    ],
+                ];
+            }
+        }
+
+        $installerPaths['wordpress/wp-content/plugins/{$name}/'] = ['type:wordpress-plugin'];
         $composerContents = json_encode([
-            'repositories' => [
-                [
-                    'type' => 'composer',
-                    'url' => 'https://wpackagist.org',
-                ],
-            ],
-            'require' => [
-                'roots/wordpress' => $this->config->wordpressVersion(),
-                'wpackagist-plugin/sqlite-database-integration' => '^2.2',
-            ],
+            'repositories' => $repositories,
+            'require' => $requirements,
             'extra' => [
                 'wordpress-install-dir' => 'wordpress',
-                'installer-paths' => [
-                    'wordpress/wp-content/plugins/{$name}/' => ['type:wordpress-plugin'],
-                ],
+                'installer-paths' => $installerPaths,
             ],
             'config' => [
                 'allow-plugins' => [

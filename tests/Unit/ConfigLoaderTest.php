@@ -64,6 +64,25 @@ PHP);
     (new ConfigLoader)->load($this->workspace);
 })->throws(ValidationException::class, 'plugin.path is required');
 
+it('rejects invalid plugin dependency definitions', function (): void {
+    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+<?php
+
+return [
+    'target' => 'plugin',
+    'tests' => ['code'],
+    'plugin' => ['path' => '.'],
+    'plugins' => [
+        'dependencies' => [
+            ['url' => 'not-a-url'],
+        ],
+    ],
+];
+PHP);
+
+    (new ConfigLoader)->load($this->workspace);
+})->throws(ValidationException::class, 'Each plugin dependency');
+
 it('applies environment overrides', function (): void {
     putenv('WP_PEST_TARGET=plugin');
     putenv('WP_PEST_TESTS=browser');

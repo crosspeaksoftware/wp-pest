@@ -108,6 +108,7 @@ final class WpPest
 
         if ($this->target() === 'plugin') {
             $this->installWordPress();
+            $this->loadDependencies($path);
             $this->loadPlugin($this->pluginPath());
         }
 
@@ -156,6 +157,17 @@ final class WpPest
 
         if (function_exists($installingName)) {
             $this->callFunction($installingName, false);
+        }
+    }
+
+    private function loadDependencies(string $wordpressPath): void
+    {
+        foreach ($this->config->dependencyPlugins() as $dependency) {
+            $path = $dependency->isLocalPath()
+                ? $this->absolutePath($dependency->source())
+                : $wordpressPath.DIRECTORY_SEPARATOR.'wp-content'.DIRECTORY_SEPARATOR.'plugins'.DIRECTORY_SEPARATOR.$dependency->slug();
+
+            $this->loadPlugin($path);
         }
     }
 

@@ -14,6 +14,16 @@ return [
     'target' => 'plugin',
     'tests' => ['code'],
     'plugin' => ['path' => '.'],
+    'plugins' => [
+        'dependencies' => [
+            'akismet',
+            [
+                'slug' => 'gravityforms',
+                'version' => '2.10.5',
+                'url' => 'https://plugins.example.test/gravityforms-2.10.5.zip',
+            ],
+        ],
+    ],
 ];
 PHP);
 
@@ -32,7 +42,15 @@ PHP);
         ->and($composer['require'])->toHaveKeys([
             'roots/wordpress',
             'wpackagist-plugin/sqlite-database-integration',
+            'wpackagist-plugin/akismet',
         ])
+        ->and(array_keys($composer['require']))->toContain(
+            'wp-pest-plugin/gravityforms-'.substr(sha1('https://plugins.example.test/gravityforms-2.10.5.zip'), 0, 12),
+        )
+        ->and($composer['repositories'][1]['type'])->toBe('package')
+        ->and($composer['repositories'][1]['package']['dist']['url'])
+        ->toBe('https://plugins.example.test/gravityforms-2.10.5.zip')
+        ->and($composer['extra']['installer-paths'])->toHaveKey('wordpress/wp-content/plugins/gravityforms/')
         ->and($composer['extra']['installer-paths'])->toHaveKey('wordpress/wp-content/plugins/{$name}/')
         ->and($composer['config']['allow-plugins']['composer/installers'])->toBeTrue()
         ->and($composer['config']['allow-plugins']['roots/wordpress-core-installer'])->toBeTrue()

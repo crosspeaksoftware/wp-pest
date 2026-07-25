@@ -169,6 +169,23 @@ final class ConfigLoader
             $errors[] = 'plugin.path is required when target is "plugin".';
         }
 
+        $dependencies = $config['plugins']['dependencies'] ?? null;
+        if (! is_array($dependencies)) {
+            $errors[] = 'plugins.dependencies must be an array.';
+        } else {
+            foreach ($dependencies as $dependency) {
+                if (is_string($dependency) && $dependency !== '') {
+                    continue;
+                }
+
+                if (is_array($dependency) && $this->validPluginDependency($dependency)) {
+                    continue;
+                }
+
+                $errors[] = 'Each plugin dependency must be a slug, path, URL, or an array containing slug, path, or url.';
+            }
+        }
+
         if (! is_array($config['sandbox']['matrix'] ?? null)) {
             $errors[] = 'sandbox.matrix must be an array of named matrix entries.';
         }
@@ -176,5 +193,21 @@ final class ConfigLoader
         if ($errors !== []) {
             throw new ValidationException($errors);
         }
+    }
+
+    /** @param array<mixed> $dependency */
+    private function validPluginDependency(array $dependency): bool
+    {
+        if (isset($dependency['version']) && (! is_string($dependency['version']) || $dependency['version'] === '')) {
+            return false;
+        }
+
+        foreach (['slug', 'path', 'url'] as $key) {
+            if (isset($dependency[$key]) && is_string($dependency[$key]) && $dependency[$key] !== '') {
+                return $key !== 'url' || filter_var($dependency[$key], FILTER_VALIDATE_URL) !== false;
+            }
+        }
+
+        return false;
     }
 }

@@ -54,14 +54,19 @@ final class Config
         return (string) $this->get('wordpress.version', '^7.0');
     }
 
-    /**
-     * @return list<string>
-     */
+    /** @return list<PluginDependency> */
     public function dependencyPlugins(): array
     {
         $dependencies = $this->get('plugins.dependencies', []);
 
-        return is_array($dependencies) ? array_values(array_map('strval', $dependencies)) : [];
+        if (! is_array($dependencies)) {
+            return [];
+        }
+
+        return array_values(array_map(
+            static fn (string|array $dependency): PluginDependency => PluginDependency::from($dependency),
+            $dependencies,
+        ));
     }
 
     /**

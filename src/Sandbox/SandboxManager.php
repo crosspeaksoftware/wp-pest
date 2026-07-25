@@ -7,13 +7,14 @@ namespace CrossPeak\WpPest\Sandbox;
 use CrossPeak\WpPest\Config\Config;
 use CrossPeak\WpPest\Config\ValidationException;
 use CrossPeak\WpPest\Support\Process;
+use CrossPeak\WpPest\Support\ProcessRunner;
 
 final class SandboxManager
 {
     public function __construct(
         private readonly Config $config,
         private readonly string $workingDirectory,
-        private readonly Process $process = new Process,
+        private readonly ProcessRunner $process = new Process,
     ) {}
 
     /**
@@ -131,7 +132,14 @@ final class SandboxManager
         $pluginMount = $this->absolutePath($pluginPath);
         $dependencyMounts = '';
 
-        foreach (array_merge($this->config->dependencyPlugins(), $entry->plugins()) as $index => $dependency) {
+        $dependencies = $entry->plugins();
+        foreach ($this->config->dependencyPlugins() as $dependency) {
+            if ($dependency->isLocalPath()) {
+                $dependencies[] = $dependency->source();
+            }
+        }
+
+        foreach ($dependencies as $index => $dependency) {
             if (is_dir($this->absolutePath($dependency))) {
                 $dependencyMounts .= "      - {$this->absolutePath($dependency)}:/var/www/html/wp-content/plugins/dependency-{$index}\n";
             }
@@ -202,11 +210,34 @@ YAML;
     private function setupWordPress(string $name): int
     {
         $url = $this->url($name);
-        $script = implode(' && ', [
+        $commands = [
             'until wp db check --allow-root >/dev/null 2>&1; do sleep 2; done',
             'wp core install --allow-root --url='.escapeshellarg($url).' --title='.escapeshellarg('WP Pest').' --admin_user=admin --admin_password=password --admin_email=admin@example.test --skip-email || true',
-            'wp plugin activate plugin-under-test --allow-root',
-        ]);
+        ];
+
+        $mountedDependency = count($this->entry($name)->plugins());
+        foreach ($this->entry($name)->plugins() as $index => $dependency) {
+            if (is_dir($this->absolutePath($dependency))) {
+                $commands[] = 'wp plugin activate '.escapeshellarg('dependency-'.$index).' --allow-root';
+            }
+        }
+
+        foreach ($this->config->dependencyPlugins() as $dependency) {
+            if ($dependency->isLocalPath()) {
+                if (is_dir($this->absolutePath($dependency->source()))) {
+                    $commands[] = 'wp plugin activate '.escapeshellarg('dependency-'.$mountedDependency).' --allow-root';
+                }
+                $mountedDependency++;
+
+                continue;
+            }
+
+            $source = $dependency->isUrl() ? $dependency->source() : $dependency->slug();
+            $commands[] = 'wp plugin install '.escapeshellarg($source).' --activate --force --allow-root';
+        }
+
+        $commands[] = 'wp plugin activate plugin-under-test --allow-root';
+        $script = implode(' && ', $commands);
 
         return $this->compose($name, ['run', '--rm', 'wpcli', 'sh', '-lc', $script]);
     }
