@@ -75,7 +75,7 @@ final class Application
         }
 
         $this->copyExampleTests($workingDirectory, $target);
-        $this->appendGitignore($gitignore, [".wp-pest/\n", "tests/Browser/Screenshots/\n"]);
+        $this->appendGitignore($gitignore, [".wp-pest/\n", ".phpunit.cache/\n", "tests/Browser/Screenshots/\n"]);
 
         return 0;
     }
@@ -274,6 +274,10 @@ final class Application
         foreach ($entries as $entry) {
             if (str_contains($contents, $entry)) {
                 continue;
+            }
+
+            if (! $updated && $contents !== '' && ! str_ends_with($contents, "\n")) {
+                $contents .= "\n";
             }
 
             $contents .= $entry;

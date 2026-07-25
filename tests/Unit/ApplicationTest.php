@@ -6,6 +6,7 @@ use CrossPeak\WpPest\Cli\Application;
 use CrossPeak\WpPest\Support\ProcessRunner;
 
 it('initializes site mode by default', function (): void {
+    file_put_contents($this->workspace.'/.gitignore', 'dist/');
     $previous = getcwd();
     chdir($this->workspace);
     ob_start();
@@ -30,7 +31,9 @@ it('initializes site mode by default', function (): void {
         ->and(file_get_contents($this->workspace.'/phpunit.xml.dist'))->toContain('<testsuite name="Browser">')
         ->and($this->workspace.'/tests/Code/SiteTest.php')->toBeFile()
         ->and($this->workspace.'/tests/Browser/SiteTest.php')->toBeFile()
+        ->and(file_get_contents($this->workspace.'/.gitignore'))->toStartWith("dist/\n.wp-pest/\n")
         ->and(file_get_contents($this->workspace.'/.gitignore'))->toContain('.wp-pest/')
+        ->and(file_get_contents($this->workspace.'/.gitignore'))->toContain('.phpunit.cache/')
         ->and(file_get_contents($this->workspace.'/.gitignore'))->toContain('tests/Browser/Screenshots/');
 });
 

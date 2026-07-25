@@ -6,6 +6,7 @@ namespace CrossPeak\WpPest\Runtime;
 
 use CrossPeak\WpPest\Config\Config;
 use CrossPeak\WpPest\Config\ConfigLoader;
+use CrossPeak\WpPest\Sandbox\PluginFixture;
 use CrossPeak\WpPest\Support\SiteDetector;
 
 final class WpPest
@@ -88,6 +89,11 @@ final class WpPest
     {
         $path = $this->wordpressPath();
 
+        if ($path === null && $this->target() === 'plugin') {
+            $fixture = (new PluginFixture($this->config, $this->workingDirectory))->ensure();
+            $path = $fixture.DIRECTORY_SEPARATOR.'wordpress';
+        }
+
         if ($path === null) {
             return false;
         }
@@ -100,7 +106,84 @@ final class WpPest
 
         require_once $wpLoad;
 
+        if ($this->target() === 'plugin') {
+            $this->installWordPress();
+            $this->loadPlugin($this->pluginPath());
+        }
+
         return true;
+    }
+
+    private function installWordPress(): void
+    {
+        $isBlogInstalledName = 'is_blog_installed';
+        if (! function_exists($isBlogInstalledName)) {
+            return;
+        }
+
+        $installingName = 'wp_installing';
+        if ($this->callFunction($isBlogInstalledName)) {
+            if (function_exists($installingName)) {
+                $this->callFunction($installingName, false);
+            }
+
+            return;
+        }
+
+        $absolutePath = defined('ABSPATH') ? constant('ABSPATH') : null;
+        if (! is_string($absolutePath)) {
+            return;
+        }
+
+        require_once $absolutePath.'wp-admin/includes/upgrade.php';
+
+        $installName = 'wp_install';
+        $addFilterName = 'add_filter';
+        $removeFilterName = 'remove_filter';
+        $skipMail = static fn (): bool => true;
+
+        if (function_exists($addFilterName)) {
+            $this->callFunction($addFilterName, 'pre_wp_mail', $skipMail);
+        }
+
+        if (function_exists($installName)) {
+            $this->callFunction($installName, 'WP Pest', 'admin', 'admin@example.test', true, '', 'password');
+        }
+
+        if (function_exists($removeFilterName)) {
+            $this->callFunction($removeFilterName, 'pre_wp_mail', $skipMail);
+        }
+
+        if (function_exists($installingName)) {
+            $this->callFunction($installingName, false);
+        }
+    }
+
+    private function loadPlugin(?string $path): void
+    {
+        if ($path === null || ! is_dir($path)) {
+            return;
+        }
+
+        foreach (glob($path.DIRECTORY_SEPARATOR.'*.php') ?: [] as $file) {
+            $getFileDataName = 'get_file_data';
+            if (! function_exists($getFileDataName)) {
+                return;
+            }
+
+            $headers = $this->callFunction($getFileDataName, $file, ['name' => 'Plugin Name'], 'plugin');
+
+            if (is_array($headers) && ($headers['name'] ?? '') !== '') {
+                require_once $file;
+
+                return;
+            }
+        }
+    }
+
+    private function callFunction(string $name, mixed ...$arguments): mixed
+    {
+        return (new \ReflectionFunction($name))->invokeArgs($arguments);
     }
 
     private function absolutePath(string $path): string

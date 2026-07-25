@@ -53,6 +53,8 @@ The generated `tests/Pest.php` bootstraps WordPress before the tests execute.
 It also increases Pest Browser's default wait timeout from five seconds to one minute.
 The generated browser tests assert that the page source includes a document body and that there are no JavaScript errors.
 
+For plugin Code tests, the first run creates a real WordPress fixture under `.wp-pest/fixtures`, backed by the WordPress SQLite integration so no external database service is required. WordPress is installed and the plugin under test is loaded before the Code suite runs.
+
 ## Configuration
 
 Create `wp-pest.php` in the project root:
