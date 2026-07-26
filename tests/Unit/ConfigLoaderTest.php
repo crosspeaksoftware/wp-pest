@@ -72,7 +72,7 @@ PHP);
     (new ConfigLoader)->load($this->workspace);
 })->throws(ValidationException::class, 'site.url is required');
 
-it('requires a plugin path for plugin tests', function (): void {
+it('defaults the plugin path to the current directory', function (): void {
     file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
 <?php
 
@@ -82,8 +82,10 @@ return [
 ];
 PHP);
 
-    (new ConfigLoader)->load($this->workspace);
-})->throws(ValidationException::class, 'plugin.path is required');
+    $config = (new ConfigLoader)->load($this->workspace);
+
+    expect($config->pluginPath())->toBe('.');
+});
 
 it('rejects invalid plugin dependency definitions', function (): void {
     file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'

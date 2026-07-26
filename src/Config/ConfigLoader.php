@@ -179,8 +179,9 @@ final class ConfigLoader
             $errors[] = 'site.url is required when target is "site" and browser tests are enabled.';
         }
 
-        if ($target === 'plugin' && empty($config['plugin']['path'])) {
-            $errors[] = 'plugin.path is required when target is "plugin".';
+        $pluginPath = $config['plugin']['path'] ?? null;
+        if ($pluginPath !== null && ! is_string($pluginPath)) {
+            $errors[] = 'plugin.path must be a string when provided.';
         }
 
         $dependencies = $config['plugins']['dependencies'] ?? null;

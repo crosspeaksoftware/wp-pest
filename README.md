@@ -65,7 +65,6 @@ Create `wp-pest.php` in the project root:
 return [
     'target' => 'plugin',
     'tests' => ['code', 'browser'],
-    'plugin' => ['path' => '.'],
     'plugins' => [
         'dependencies' => [
             '../shared/local-plugin',
@@ -119,6 +118,8 @@ return [
     ],
 ];
 ```
+
+For plugin targets, `plugin.path` defaults to the current directory. You may set it when the plugin under test is in another directory.
 
 Plugin dependencies are installed and loaded before the plugin under test in both Code fixtures and browser sandboxes. Use a WordPress.org plugin slug, a local directory path, a ZIP URL, or an explicit array with `slug`, `version`, and `url` keys. Explicit ZIP definitions are recommended when the filename does not contain a reliable plugin slug and version.
 Only configure ZIP URLs that you trust: the downloaded plugin code is loaded and executed during the test bootstrap.

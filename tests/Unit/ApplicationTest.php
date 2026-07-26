@@ -53,7 +53,7 @@ it('initializes plugin mode when requested', function (): void {
 
     expect($exitCode)->toBe(0)
         ->and($config['target'])->toBe('plugin')
-        ->and($config['plugin']['path'])->toBe('.')
+        ->and($config)->not->toHaveKey('plugin')
         ->and($config['matrix']['wordpress'])->toBe(['^6.9', '^7.0'])
         ->and($config['matrix']['profiles']['default']['tests'])->toBe(['code', 'browser'])
         ->and($this->workspace.'/tests/Code/PluginTest.php')->toBeFile()

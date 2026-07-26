@@ -15,10 +15,6 @@ return [
         'version' => '^7.0',
     ],
 
-    'plugin' => [
-        'path' => '.',
-    ],
-
     'plugins' => [
         'dependencies' => [],
     ],

@@ -55,7 +55,7 @@ final class Config
 
     public function pluginPath(): ?string
     {
-        return $this->nullableString('plugin.path');
+        return $this->nullableString('plugin.path') ?? ($this->target() === 'plugin' ? '.' : null);
     }
 
     public function wordpressVersion(): string
