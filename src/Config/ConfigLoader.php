@@ -200,10 +200,6 @@ final class ConfigLoader
             }
         }
 
-        if (isset($config['sandbox']['matrix'])) {
-            $errors[] = 'sandbox.matrix is no longer supported; move matrix configuration to the top-level matrix key.';
-        }
-
         if (! is_array($config['matrix'] ?? null)) {
             $errors[] = 'matrix must be an array.';
         }
