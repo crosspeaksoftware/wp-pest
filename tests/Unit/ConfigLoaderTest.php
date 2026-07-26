@@ -22,9 +22,10 @@ return [
     'target' => 'plugin',
     'tests' => ['code', 'browser'],
     'plugin' => ['path' => 'my-plugin'],
-    'sandbox' => [
-        'matrix' => [
-            'php83' => ['php' => '8.3', 'wordpress' => '^7.0'],
+    'matrix' => [
+        'wordpress' => ['^6.9', '^7.0'],
+        'profiles' => [
+            'default' => ['tests' => ['code', 'browser']],
         ],
     ],
 ];
@@ -35,7 +36,27 @@ PHP);
     expect($config->target())->toBe('plugin')
         ->and($config->tests())->toBe(['code', 'browser'])
         ->and($config->pluginPath())->toBe('my-plugin')
-        ->and(array_keys($config->sandboxMatrix()))->toBe(['php83']);
+        ->and($config->matrixCombinations())->toHaveCount(2)
+        ->and($config->matrixCombinations()[0]->tests())->toBe(['code', 'browser']);
+});
+
+it('uses the top-level tests and wordpress settings for the default matrix', function (): void {
+    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+<?php
+
+return [
+    'target' => 'plugin',
+    'tests' => ['browser'],
+    'site' => ['url' => 'https://example.test'],
+    'wordpress' => ['version' => '^6.9'],
+    'plugin' => ['path' => '.'],
+];
+PHP);
+
+    $combination = (new ConfigLoader)->load($this->workspace)->matrixCombinations()[0];
+
+    expect($combination->tests())->toBe(['browser'])
+        ->and($combination->wordpress())->toBe('^6.9');
 });
 
 it('requires a url for site browser tests', function (): void {

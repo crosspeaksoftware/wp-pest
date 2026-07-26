@@ -25,23 +25,33 @@ return [
 
     'sandbox' => [
         'path' => '.wp-pest/sandboxes',
-        'matrix' => [
-            'php83-wp-latest' => [
-                'php' => '8.3',
-                'wordpress' => '^7.0',
-                'database' => 'mariadb:11',
+    ],
+
+    'matrix' => [
+        'wordpress' => ['^6.9', '^7.0'],
+        'plugins' => [
+            'query-monitor' => ['3.19.0', '3.20.0'],
+        ],
+        'profiles' => [
+            'default' => [
+                'tests' => ['code', 'browser'],
                 'plugins' => [],
-                'env' => [],
-                'port' => 8080,
-            ],
-            'php84-wp-latest' => [
-                'php' => '8.4',
-                'wordpress' => '^7.0',
-                'database' => 'mariadb:11',
-                'plugins' => [],
-                'env' => [],
-                'port' => 8081,
+                'inherit_plugins' => true,
+                'exclude_plugins' => [],
+                'groups' => [],
             ],
         ],
+        'exclude' => [
+            [
+                'wordpress' => '^6.9',
+                'plugins' => ['query-monitor' => '3.20.0'],
+            ],
+        ],
+        'browser' => [
+            'database' => 'mariadb:11',
+            'env' => [],
+            'port' => 8080,
+        ],
+        'max_combinations' => 100,
     ],
 ];

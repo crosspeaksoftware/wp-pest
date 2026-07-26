@@ -6,6 +6,7 @@ namespace CrossPeak\WpPest\Sandbox;
 
 use CrossPeak\WpPest\Config\Config;
 use CrossPeak\WpPest\Config\ValidationException;
+use CrossPeak\WpPest\Matrix\MatrixCombination;
 use CrossPeak\WpPest\Support\Process;
 use CrossPeak\WpPest\Support\ProcessRunner;
 
@@ -22,7 +23,7 @@ final class SandboxManager
      */
     public function matrixNames(?string $selection = null): array
     {
-        $names = array_keys($this->config->sandboxMatrix());
+        $names = array_map(static fn (MatrixCombination $entry): string => $entry->name(), $this->config->matrixCombinations());
 
         if ($selection === null || $selection === '') {
             return $names === [] ? [] : [$names[0]];
@@ -33,7 +34,7 @@ final class SandboxManager
         }
 
         if (! in_array($selection, $names, true)) {
-            throw new ValidationException(["Unknown sandbox matrix entry: {$selection}."]);
+            throw new ValidationException(["Unknown matrix combination: {$selection}."]);
         }
 
         return [$selection];
@@ -92,15 +93,15 @@ final class SandboxManager
         return "http://127.0.0.1:{$port}";
     }
 
-    private function entry(string $name): MatrixEntry
+    private function entry(string $name): MatrixCombination
     {
-        $matrix = $this->config->sandboxMatrix();
-
-        if (! isset($matrix[$name])) {
-            throw new ValidationException(["Unknown sandbox matrix entry: {$name}."]);
+        foreach ($this->config->matrixCombinations() as $entry) {
+            if ($entry->name() === $name) {
+                return $entry;
+            }
         }
 
-        return new MatrixEntry($name, $matrix[$name]);
+        throw new ValidationException(["Unknown matrix combination: {$name}."]);
     }
 
     /**
@@ -121,27 +122,27 @@ final class SandboxManager
         return $this->workingDirectory.DIRECTORY_SEPARATOR.trim($base, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.$name;
     }
 
-    private function composeYaml(MatrixEntry $entry): string
+    private function composeYaml(MatrixCombination $entry): string
     {
         $port = $entry->port();
         if ($port <= 0) {
-            $port = 8080 + abs(crc32($entry->name)) % 1000;
+            $port = 8080 + abs(crc32($entry->name())) % 1000;
         }
 
         $pluginPath = $this->config->pluginPath() ?? '.';
         $pluginMount = $this->absolutePath($pluginPath);
         $dependencyMounts = '';
 
-        $dependencies = $entry->plugins();
-        foreach ($this->config->dependencyPlugins() as $dependency) {
-            if ($dependency->isLocalPath()) {
-                $dependencies[] = $dependency->source();
-            }
-        }
+        foreach ($entry->plugins() as $index => $dependency) {
+            if ($dependency->isLocalPath() && is_dir($this->absolutePath($dependency->source()))) {
+                $dependencyMounts .= "      - {$this->absolutePath($dependency->source())}:/var/www/html/wp-content/plugins/dependency-{$index}\n";
 
-        foreach ($dependencies as $index => $dependency) {
-            if (is_dir($this->absolutePath($dependency))) {
-                $dependencyMounts .= "      - {$this->absolutePath($dependency)}:/var/www/html/wp-content/plugins/dependency-{$index}\n";
+                continue;
+            }
+
+            $fixturePath = $this->fixtureDependencyPath($dependency->slug());
+            if ($fixturePath !== null) {
+                $dependencyMounts .= "      - {$fixturePath}:/var/www/html/wp-content/plugins/{$dependency->slug()}\n";
             }
         }
 
@@ -150,10 +151,16 @@ final class SandboxManager
             $environment .= "      {$key}: ".json_encode($value, JSON_THROW_ON_ERROR)."\n";
         }
 
+        $php = PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION;
+        $resolvedWordpress = getenv('WP_PEST_RESOLVED_WORDPRESS_VERSION');
+        $wordpressImage = is_string($resolvedWordpress) && $resolvedWordpress !== ''
+            ? "wordpress:{$resolvedWordpress}-php{$php}-apache"
+            : "wordpress:php{$php}-apache";
+
         return <<<YAML
 services:
   wordpress:
-    image: wordpress:php{$entry->php()}-apache
+    image: {$wordpressImage}
     ports:
       - "{$port}:80"
     environment:
@@ -168,7 +175,7 @@ services:
       - database
 
   wpcli:
-    image: wordpress:cli-php{$entry->php()}
+    image: wordpress:cli-php{$php}
     environment:
       WORDPRESS_DB_HOST: database
       WORDPRESS_DB_NAME: wordpress
@@ -215,30 +222,44 @@ YAML;
             'wp core install --allow-root --url='.escapeshellarg($url).' --title='.escapeshellarg('WP Pest').' --admin_user=admin --admin_password=password --admin_email=admin@example.test --skip-email || true',
         ];
 
-        $mountedDependency = count($this->entry($name)->plugins());
         foreach ($this->entry($name)->plugins() as $index => $dependency) {
-            if (is_dir($this->absolutePath($dependency))) {
+            if ($dependency->isLocalPath() && is_dir($this->absolutePath($dependency->source()))) {
                 $commands[] = 'wp plugin activate '.escapeshellarg('dependency-'.$index).' --allow-root';
-            }
-        }
 
-        foreach ($this->config->dependencyPlugins() as $dependency) {
-            if ($dependency->isLocalPath()) {
-                if (is_dir($this->absolutePath($dependency->source()))) {
-                    $commands[] = 'wp plugin activate '.escapeshellarg('dependency-'.$mountedDependency).' --allow-root';
-                }
-                $mountedDependency++;
+                continue;
+            }
+
+            if ($this->fixtureDependencyPath($dependency->slug()) !== null) {
+                $commands[] = 'wp plugin activate '.escapeshellarg($dependency->slug()).' --allow-root';
 
                 continue;
             }
 
             $source = $dependency->isUrl() ? $dependency->source() : $dependency->slug();
-            $commands[] = 'wp plugin install '.escapeshellarg($source).' --activate --force --allow-root';
+            $version = ! $dependency->isUrl() && preg_match('/^\d+(?:\.\d+)*(?:[-+][a-z0-9.-]+)?$/i', $dependency->version()) === 1
+                ? ' --version='.escapeshellarg($dependency->version())
+                : '';
+            $commands[] = 'wp plugin install '.escapeshellarg($source).$version.' --activate --force --allow-root';
         }
 
         $commands[] = 'wp plugin activate plugin-under-test --allow-root';
         $script = implode(' && ', $commands);
 
         return $this->compose($name, ['run', '--rm', 'wpcli', 'sh', '-lc', $script]);
+    }
+
+    private function fixtureDependencyPath(string $slug): ?string
+    {
+        $wordpressPath = getenv('WP_PEST_WORDPRESS_PATH');
+        if (! is_string($wordpressPath) || $wordpressPath === '') {
+            return null;
+        }
+
+        $path = rtrim($wordpressPath, DIRECTORY_SEPARATOR)
+            .DIRECTORY_SEPARATOR.'wp-content'
+            .DIRECTORY_SEPARATOR.'plugins'
+            .DIRECTORY_SEPARATOR.$slug;
+
+        return is_dir($path) ? $path : null;
     }
 }

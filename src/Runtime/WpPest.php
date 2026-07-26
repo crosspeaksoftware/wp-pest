@@ -13,6 +13,9 @@ final class WpPest
 {
     private static ?self $instance = null;
 
+    /** @var array<string, string|null> */
+    private array $loadedPlugins = [];
+
     public function __construct(
         private readonly Config $config,
         private readonly string $workingDirectory,
@@ -71,18 +74,58 @@ final class WpPest
         return $path === null ? null : $this->absolutePath($path);
     }
 
-    /**
-     * @return array<string, mixed>|null
-     */
-    public function sandbox(): ?array
+    public function matrixName(): ?string
     {
         $name = getenv('WP_PEST_MATRIX');
 
-        if (! is_string($name) || $name === '') {
-            return null;
-        }
+        return is_string($name) && $name !== '' ? $name : $this->config->activeMatrix()?->name();
+    }
 
-        return $this->config->sandboxMatrix()[$name] ?? null;
+    /** @return array<string, mixed>|null */
+    public function matrix(): ?array
+    {
+        return $this->config->activeMatrix()?->all();
+    }
+
+    public function phpVersion(): string
+    {
+        return PHP_VERSION;
+    }
+
+    public function phpVersionIs(string $constraint): bool
+    {
+        return $this->versionIs(PHP_VERSION, $constraint);
+    }
+
+    public function wordpressVersion(): ?string
+    {
+        $getBlogInfo = 'get_bloginfo';
+
+        return function_exists($getBlogInfo) ? (string) $this->callFunction($getBlogInfo, 'version') : null;
+    }
+
+    public function wordpressVersionIs(string $constraint): bool
+    {
+        $version = $this->wordpressVersion();
+
+        return $version !== null && $this->versionIs($version, $constraint);
+    }
+
+    public function hasPlugin(string $slug): bool
+    {
+        return array_key_exists($this->normalizeSlug($slug), $this->loadedPlugins);
+    }
+
+    public function pluginVersion(string $slug): ?string
+    {
+        return $this->loadedPlugins[$this->normalizeSlug($slug)] ?? null;
+    }
+
+    public function pluginVersionIs(string $slug, string $constraint): bool
+    {
+        $version = $this->pluginVersion($slug);
+
+        return $version !== null && $this->versionIs($version, $constraint);
     }
 
     public function bootstrapWordPress(): bool
@@ -183,10 +226,11 @@ final class WpPest
                 return;
             }
 
-            $headers = $this->callFunction($getFileDataName, $file, ['name' => 'Plugin Name'], 'plugin');
+            $headers = $this->callFunction($getFileDataName, $file, ['name' => 'Plugin Name', 'version' => 'Version'], 'plugin');
 
             if (is_array($headers) && ($headers['name'] ?? '') !== '') {
                 require_once $file;
+                $this->loadedPlugins[$this->normalizeSlug(basename($path))] = ($headers['version'] ?? '') !== '' ? (string) $headers['version'] : null;
 
                 return;
             }
@@ -196,6 +240,25 @@ final class WpPest
     private function callFunction(string $name, mixed ...$arguments): mixed
     {
         return (new \ReflectionFunction($name))->invokeArgs($arguments);
+    }
+
+    private function versionIs(string $version, string $constraint): bool
+    {
+        if (preg_match('/^(>=|<=|!=|==|>|<|=)?\s*(.+)$/', trim($constraint), $matches) !== 1) {
+            return false;
+        }
+
+        $operator = $matches[1] === '' ? '==' : $matches[1];
+        $operator = $operator === '=' ? '==' : $operator;
+
+        return version_compare($version, $matches[2], $operator);
+    }
+
+    private function normalizeSlug(string $slug): string
+    {
+        $slug = str_starts_with($slug, 'wpackagist-plugin/') ? substr($slug, strlen('wpackagist-plugin/')) : $slug;
+
+        return trim((string) preg_replace('/[^a-z0-9_-]+/i', '-', strtolower($slug)), '-');
     }
 
     private function absolutePath(string $path): string

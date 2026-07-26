@@ -27,7 +27,7 @@ return [
 ];
 PHP);
 
-    $fixturePath = $this->workspace.'/.wp-pest/fixtures/wordpress';
+    $fixturePath = $this->workspace.'/.wp-pest/fixtures/default--wp-7.0';
     $contentPath = $fixturePath.'/wordpress/wp-content';
     mkdir($contentPath.'/plugins/sqlite-database-integration', 0775, true);
     file_put_contents($fixturePath.'/wordpress/wp-load.php', '<?php');
@@ -56,9 +56,15 @@ PHP);
         ->and($composer['config']['allow-plugins']['roots/wordpress-core-installer'])->toBeTrue()
         ->and($process->commands)->toBe([])
         ->and($contentPath.'/db.php')->toBeFile()
+        ->and($contentPath.'/themes/wp-pest/style.css')->toBeFile()
+        ->and($contentPath.'/themes/wp-pest/index.php')->toBeFile()
         ->and($fixturePath.'/wordpress/wp-config.php')->toBeFile()
         ->and(file_get_contents($fixturePath.'/wordpress/wp-config.php'))
-        ->toContain("define('DB_FILE', 'wordpress.sqlite');", "define('WP_INSTALLING', true);");
+        ->toContain(
+            "define('DB_FILE', 'wordpress.sqlite');",
+            "define('WP_DEFAULT_THEME', 'wp-pest');",
+            "define('WP_INSTALLING', true);",
+        );
 });
 
 final class FixtureRecordingProcess implements ProcessRunner

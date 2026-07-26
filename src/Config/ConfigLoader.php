@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace CrossPeak\WpPest\Config;
 
+use CrossPeak\WpPest\Matrix\MatrixExpander;
+
 final class ConfigLoader
 {
     /**
@@ -29,17 +31,22 @@ final class ConfigLoader
             ],
             'sandbox' => [
                 'path' => '.wp-pest/sandboxes',
-                'matrix' => [
+            ],
+            'matrix' => [
+                'wordpress' => ['^7.0'],
+                'plugins' => [],
+                'profiles' => [
                     'default' => [
-                        'php' => '8.3',
-                        'wordpress' => '^7.0',
-                        'database' => 'mariadb:11',
-                        'theme' => null,
-                        'plugins' => [],
-                        'env' => [],
-                        'port' => 0,
+                        'tests' => ['code'],
                     ],
                 ],
+                'exclude' => [],
+                'browser' => [
+                    'database' => 'mariadb:11',
+                    'env' => [],
+                    'port' => 0,
+                ],
+                'max_combinations' => 100,
             ],
         ];
     }
@@ -60,6 +67,13 @@ final class ConfigLoader
         }
 
         $config = $this->merge(self::defaults(), $userConfig);
+        $userMatrix = $userConfig['matrix'] ?? null;
+        if (! is_array($userMatrix) || ! array_key_exists('profiles', $userMatrix)) {
+            $config['matrix']['profiles']['default']['tests'] = $config['tests'];
+        }
+        if ((! is_array($userMatrix) || ! array_key_exists('wordpress', $userMatrix)) && isset($userConfig['wordpress']['version'])) {
+            $config['matrix']['wordpress'] = [$config['wordpress']['version']];
+        }
         $config = $this->applyEnvironment($config);
 
         $this->validate($config);
@@ -75,7 +89,7 @@ final class ConfigLoader
     private function merge(array $base, array $override): array
     {
         foreach ($override as $key => $value) {
-            if ($key === 'matrix' && is_array($value)) {
+            if ($key === 'profiles' && is_array($value)) {
                 $base[$key] = $value;
 
                 continue;
@@ -186,13 +200,19 @@ final class ConfigLoader
             }
         }
 
-        if (! is_array($config['sandbox']['matrix'] ?? null)) {
-            $errors[] = 'sandbox.matrix must be an array of named matrix entries.';
+        if (isset($config['sandbox']['matrix'])) {
+            $errors[] = 'sandbox.matrix is no longer supported; move matrix configuration to the top-level matrix key.';
+        }
+
+        if (! is_array($config['matrix'] ?? null)) {
+            $errors[] = 'matrix must be an array.';
         }
 
         if ($errors !== []) {
             throw new ValidationException($errors);
         }
+
+        (new MatrixExpander)->expand(new Config($config));
     }
 
     /** @param array<mixed> $dependency */

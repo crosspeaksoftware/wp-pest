@@ -54,7 +54,8 @@ it('initializes plugin mode when requested', function (): void {
     expect($exitCode)->toBe(0)
         ->and($config['target'])->toBe('plugin')
         ->and($config['plugin']['path'])->toBe('.')
-        ->and($config['sandbox']['matrix'])->toHaveKeys(['php83-wp-latest', 'php84-wp-latest'])
+        ->and($config['matrix']['wordpress'])->toBe(['^6.9', '^7.0'])
+        ->and($config['matrix']['profiles']['default']['tests'])->toBe(['code', 'browser'])
         ->and($this->workspace.'/tests/Code/PluginTest.php')->toBeFile()
         ->and($this->workspace.'/tests/Browser/PluginTest.php')->toBeFile();
 });

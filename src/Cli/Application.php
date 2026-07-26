@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace CrossPeak\WpPest\Cli;
 
+use CrossPeak\WpPest\Config\Config;
 use CrossPeak\WpPest\Config\ConfigLoader;
 use CrossPeak\WpPest\Config\ValidationException;
+use CrossPeak\WpPest\Matrix\MatrixCombination;
 use CrossPeak\WpPest\Sandbox\PluginFixture;
 use CrossPeak\WpPest\Sandbox\SandboxManager;
 use CrossPeak\WpPest\Support\Process;
@@ -26,6 +28,7 @@ final class Application
                 'init' => $this->init($workingDirectory, array_slice($argv, 2)),
                 'doctor' => $this->doctor($workingDirectory),
                 'run' => $this->runPest($workingDirectory, array_slice($argv, 2)),
+                'matrix:list' => $this->matrixList($workingDirectory),
                 'sandbox:start' => $this->sandbox($workingDirectory, 'start', $argv[2] ?? getenv('WP_PEST_MATRIX') ?: null),
                 'sandbox:stop' => $this->sandbox($workingDirectory, 'stop', $argv[2] ?? getenv('WP_PEST_MATRIX') ?: null),
                 'sandbox:reset' => $this->sandbox($workingDirectory, 'reset', $argv[2] ?? getenv('WP_PEST_MATRIX') ?: null),
@@ -93,11 +96,19 @@ final class Application
             $errors[] = 'plugin.path does not exist or is not a directory.';
         }
 
-        if ($config->hasBrowserTests() && ! $this->commandExists('node')) {
+        $hasBrowserTests = $config->hasBrowserTests();
+        if ($config->target() === 'plugin') {
+            $hasBrowserTests = array_filter(
+                $config->matrixCombinations(),
+                static fn (MatrixCombination $combination): bool => in_array('browser', $combination->tests(), true),
+            ) !== [];
+        }
+
+        if ($hasBrowserTests && ! $this->commandExists('node')) {
             $errors[] = 'node is required for Pest browser testing.';
         }
 
-        if ($config->target() === 'plugin' && $config->hasBrowserTests() && ! $this->commandExists('docker')) {
+        if ($config->target() === 'plugin' && $hasBrowserTests && ! $this->commandExists('docker')) {
             $errors[] = 'docker is required for plugin browser sandboxes.';
         }
 
@@ -126,6 +137,7 @@ final class Application
             'WP_PEST_AUTO_BOOTSTRAP_WORDPRESS',
             'WP_PEST_MATRIX',
             'WP_PEST_ACTIVE_URL',
+            'WP_PEST_RESOLVED_WORDPRESS_VERSION',
         ]);
 
         try {
@@ -148,35 +160,57 @@ final class Application
             putenv("WP_PEST_TARGET={$target}");
         }
 
-        if ($tests !== null) {
-            putenv("WP_PEST_TESTS={$tests}");
-        }
-
         $config = (new ConfigLoader)->load($workingDirectory);
-
-        if ($config->target() === 'plugin' && $config->hasCodeTests()) {
-            $fixture = (new PluginFixture($config, $workingDirectory))->ensure();
-            putenv("WP_PEST_WORDPRESS_PATH={$fixture}/wordpress");
-        }
-
-        putenv('WP_PEST_AUTO_BOOTSTRAP_WORDPRESS='.($config->hasCodeTests() ? '1' : '0'));
-
         $matrix = $this->option($arguments, 'matrix') ?? getenv('WP_PEST_MATRIX') ?: null;
 
-        if ($config->target() === 'plugin' && $config->hasBrowserTests()) {
+        if ($config->target() === 'plugin') {
             $manager = new SandboxManager($config, $workingDirectory);
             $exitCode = 0;
 
             foreach ($manager->matrixNames($matrix) as $name) {
-                $start = $manager->start($name);
-                if ($start !== 0) {
-                    return $start;
+                $entry = $this->matrixEntry($config, $name);
+                $entryTests = $entry->tests();
+                if ($tests !== null && $tests !== '') {
+                    $requested = array_map('trim', explode(',', $tests));
+                    $entryTests = array_values(array_intersect($entryTests, $requested));
+                }
+                if ($entryTests === []) {
+                    continue;
                 }
 
                 putenv("WP_PEST_MATRIX={$name}");
-                putenv('WP_PEST_ACTIVE_URL='.$manager->url($name));
-                $exitCode = $this->process->run(array_merge([$this->pestBinary($workingDirectory)], $pestArguments), $workingDirectory, true);
-                $manager->stop($name);
+                putenv('WP_PEST_TESTS='.implode(',', $entryTests));
+                putenv('WP_PEST_AUTO_BOOTSTRAP_WORDPRESS='.(in_array('code', $entryTests, true) ? '1' : '0'));
+                putenv('WP_PEST_ACTIVE_URL');
+
+                $fixtureManager = new PluginFixture($config, $workingDirectory);
+                $fixture = $fixtureManager->ensure();
+                putenv("WP_PEST_WORDPRESS_PATH={$fixture}/wordpress");
+                $resolved = $fixtureManager->resolvedWordpressVersion();
+                putenv($resolved === null ? 'WP_PEST_RESOLVED_WORDPRESS_VERSION' : "WP_PEST_RESOLVED_WORDPRESS_VERSION={$resolved}");
+
+                $browser = in_array('browser', $entryTests, true);
+                if ($browser) {
+                    $start = $manager->start($name);
+                    if ($start !== 0) {
+                        return $start;
+                    }
+
+                    putenv('WP_PEST_ACTIVE_URL='.$manager->url($name));
+                }
+
+                $entryArguments = $this->pestArguments($workingDirectory, $arguments, implode(',', $entryTests));
+                if ($entry->groups() !== []) {
+                    $entryArguments[] = '--group='.implode(',', $entry->groups());
+                }
+
+                try {
+                    $exitCode = $this->process->run(array_merge([$this->pestBinary($workingDirectory)], $entryArguments), $workingDirectory, true);
+                } finally {
+                    if ($browser) {
+                        $manager->stop($name);
+                    }
+                }
 
                 if ($exitCode !== 0) {
                     return $exitCode;
@@ -186,7 +220,43 @@ final class Application
             return $exitCode;
         }
 
+        if ($tests !== null) {
+            putenv("WP_PEST_TESTS={$tests}");
+        }
+
+        putenv('WP_PEST_AUTO_BOOTSTRAP_WORDPRESS='.($config->hasCodeTests() ? '1' : '0'));
+
         return $this->process->run(array_merge([$this->pestBinary($workingDirectory)], $pestArguments), $workingDirectory, true);
+    }
+
+    private function matrixList(string $workingDirectory): int
+    {
+        $config = (new ConfigLoader)->load($workingDirectory);
+
+        foreach ($config->matrixCombinations() as $entry) {
+            $plugins = [];
+            foreach ($entry->pluginVersions() as $slug => $version) {
+                $plugins[] = "{$slug}:{$version}";
+            }
+
+            echo $entry->name().' | WP '.$entry->wordpress().' | '.implode(',', $entry->tests());
+            echo $plugins === [] ? '' : ' | '.implode(',', $plugins);
+            echo $entry->groups() === [] ? '' : ' | groups='.implode(',', $entry->groups());
+            echo PHP_EOL;
+        }
+
+        return 0;
+    }
+
+    private function matrixEntry(Config $config, string $name): MatrixCombination
+    {
+        foreach ($config->matrixCombinations() as $entry) {
+            if ($entry->name() === $name) {
+                return $entry;
+            }
+        }
+
+        throw new ValidationException(["Unknown matrix combination: {$name}."]);
     }
 
     private function sandbox(string $workingDirectory, string $action, ?string $selection): int
@@ -194,13 +264,32 @@ final class Application
         $config = (new ConfigLoader)->load($workingDirectory);
         $manager = new SandboxManager($config, $workingDirectory);
         $exitCode = 0;
+        $environment = $this->captureEnvironment([
+            'WP_PEST_MATRIX',
+            'WP_PEST_WORDPRESS_PATH',
+            'WP_PEST_RESOLVED_WORDPRESS_VERSION',
+        ]);
 
-        foreach ($manager->matrixNames($selection) as $name) {
-            $exitCode = $manager->{$action}($name);
+        try {
+            foreach ($manager->matrixNames($selection) as $name) {
+                putenv("WP_PEST_MATRIX={$name}");
 
-            if ($exitCode !== 0) {
-                return $exitCode;
+                if (in_array($action, ['start', 'reset'], true)) {
+                    $fixtureManager = new PluginFixture($config, $workingDirectory);
+                    $fixture = $fixtureManager->ensure();
+                    putenv("WP_PEST_WORDPRESS_PATH={$fixture}/wordpress");
+                    $resolved = $fixtureManager->resolvedWordpressVersion();
+                    putenv($resolved === null ? 'WP_PEST_RESOLVED_WORDPRESS_VERSION' : "WP_PEST_RESOLVED_WORDPRESS_VERSION={$resolved}");
+                }
+
+                $exitCode = $manager->{$action}($name);
+
+                if ($exitCode !== 0) {
+                    return $exitCode;
+                }
             }
+        } finally {
+            $this->restoreEnvironment($environment);
         }
 
         return $exitCode;
@@ -209,7 +298,7 @@ final class Application
     private function help(): int
     {
         echo "Usage: wp-pest <command>\n";
-        echo "Commands: init [--target=plugin|site], doctor, run, sandbox:start, sandbox:stop, sandbox:reset, sandbox:destroy\n";
+        echo "Commands: init [--target=plugin|site], doctor, run, matrix:list, sandbox:start, sandbox:stop, sandbox:reset, sandbox:destroy\n";
 
         return 0;
     }

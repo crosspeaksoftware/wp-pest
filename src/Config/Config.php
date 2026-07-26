@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace CrossPeak\WpPest\Config;
 
+use CrossPeak\WpPest\Matrix\MatrixCombination;
+use CrossPeak\WpPest\Matrix\MatrixExpander;
+
 final class Config
 {
     /**
@@ -21,6 +24,12 @@ final class Config
      */
     public function tests(): array
     {
+        $environment = getenv('WP_PEST_TESTS');
+        $profiles = $this->get('matrix.profiles');
+        if ((! is_string($environment) || $environment === '') && is_array($profiles) && $profiles !== []) {
+            return $this->activeMatrix()?->tests() ?? array_values($this->values['tests']);
+        }
+
         return array_values($this->values['tests']);
     }
 
@@ -51,11 +60,22 @@ final class Config
 
     public function wordpressVersion(): string
     {
-        return (string) $this->get('wordpress.version', '^7.0');
+        return $this->activeMatrix()?->wordpress() ?? $this->baseWordpressVersion();
     }
 
     /** @return list<PluginDependency> */
     public function dependencyPlugins(): array
+    {
+        return $this->activeMatrix()?->plugins() ?? $this->baseDependencyPlugins();
+    }
+
+    public function baseWordpressVersion(): string
+    {
+        return (string) $this->get('wordpress.version', '^7.0');
+    }
+
+    /** @return list<PluginDependency> */
+    public function baseDependencyPlugins(): array
     {
         $dependencies = $this->get('plugins.dependencies', []);
 
@@ -69,14 +89,34 @@ final class Config
         ));
     }
 
-    /**
-     * @return array<string, array<string, mixed>>
-     */
-    public function sandboxMatrix(): array
+    /** @return array<string, mixed> */
+    public function matrixDefinition(): array
     {
-        $matrix = $this->get('sandbox.matrix', []);
+        $matrix = $this->get('matrix', []);
 
         return is_array($matrix) ? $matrix : [];
+    }
+
+    /** @return list<MatrixCombination> */
+    public function matrixCombinations(): array
+    {
+        return (new MatrixExpander)->expand($this);
+    }
+
+    public function activeMatrix(): ?MatrixCombination
+    {
+        $name = getenv('WP_PEST_MATRIX');
+        if (! is_string($name) || $name === '') {
+            return $this->matrixCombinations()[0] ?? null;
+        }
+
+        foreach ($this->matrixCombinations() as $combination) {
+            if ($combination->name() === $name) {
+                return $combination;
+            }
+        }
+
+        throw new ValidationException(["Unknown matrix combination: {$name}."]);
     }
 
     /**
