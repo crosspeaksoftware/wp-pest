@@ -7,7 +7,9 @@ namespace CrossPeak\WpPest\Runtime;
 use CrossPeak\WpPest\Config\Config;
 use CrossPeak\WpPest\Config\ConfigLoader;
 use CrossPeak\WpPest\Sandbox\PluginFixture;
+use CrossPeak\WpPest\Sandbox\SandboxManager;
 use CrossPeak\WpPest\Support\SiteDetector;
+use RuntimeException;
 
 final class WpPest
 {
@@ -15,6 +17,8 @@ final class WpPest
 
     /** @var array<string, string|null> */
     private array $loadedPlugins = [];
+
+    private ?string $managedBrowserUrl = null;
 
     public function __construct(
         private readonly Config $config,
@@ -49,9 +53,81 @@ final class WpPest
         return $this->config->hasBrowserTests();
     }
 
+    public function shouldBootstrapWordPress(): bool
+    {
+        $arguments = array_values(array_map('strval', $_SERVER['argv'] ?? []));
+        $suite = $this->commandLineOption($arguments, 'testsuite');
+        if ($suite !== null) {
+            return in_array('code', array_map('strtolower', explode(',', $suite)), true);
+        }
+
+        $hasCodePath = false;
+        $hasBrowserPath = false;
+        foreach ($arguments as $argument) {
+            $path = str_replace('\\', '/', strtolower($argument));
+            $hasCodePath = $hasCodePath || str_contains($path, 'tests/code');
+            $hasBrowserPath = $hasBrowserPath || str_contains($path, 'tests/browser');
+        }
+        if ($hasCodePath || $hasBrowserPath) {
+            return $hasCodePath;
+        }
+
+        $tests = getenv('WP_PEST_TESTS');
+        if (is_string($tests) && $tests !== '') {
+            return in_array('code', array_map('strtolower', array_map('trim', explode(',', $tests))), true);
+        }
+
+        return $this->hasCodeTests();
+    }
+
     public function url(): ?string
     {
-        return $this->config->siteUrl() ?? getenv('WP_PEST_ACTIVE_URL') ?: null;
+        $activeUrl = getenv('WP_PEST_ACTIVE_URL');
+
+        if (is_string($activeUrl) && $activeUrl !== '') {
+            return $activeUrl;
+        }
+
+        $matrix = $this->config->activeMatrix();
+        if ($this->target() === 'plugin' && $matrix !== null) {
+            $selectedMatrix = getenv('WP_PEST_MATRIX');
+            if (! is_string($selectedMatrix) || $selectedMatrix === '') {
+                return $this->startManagedBrowserSandbox($matrix->name());
+            }
+
+            return (new SandboxManager($this->config, $this->workingDirectory))->url($matrix->name());
+        }
+
+        return $this->config->siteUrl();
+    }
+
+    private function startManagedBrowserSandbox(string $name): string
+    {
+        if ($this->managedBrowserUrl !== null) {
+            return $this->managedBrowserUrl;
+        }
+
+        putenv("WP_PEST_MATRIX={$name}");
+
+        $fixtureManager = new PluginFixture($this->config, $this->workingDirectory);
+        $fixture = $fixtureManager->ensure();
+        putenv("WP_PEST_WORDPRESS_PATH={$fixture}/wordpress");
+        $resolved = $fixtureManager->resolvedWordpressVersion();
+        putenv($resolved === null ? 'WP_PEST_RESOLVED_WORDPRESS_VERSION' : "WP_PEST_RESOLVED_WORDPRESS_VERSION={$resolved}");
+
+        $manager = new SandboxManager($this->config, $this->workingDirectory);
+        if ($manager->start($name) !== 0) {
+            throw new RuntimeException("Unable to start browser sandbox {$name}.");
+        }
+
+        $this->managedBrowserUrl = $manager->url($name);
+        putenv("WP_PEST_ACTIVE_URL={$this->managedBrowserUrl}");
+
+        register_shutdown_function(static function () use ($manager, $name): void {
+            $manager->stop($name);
+        });
+
+        return $this->managedBrowserUrl;
     }
 
     public function wordpressPath(): ?string
@@ -268,5 +344,20 @@ final class WpPest
         }
 
         return $this->workingDirectory.DIRECTORY_SEPARATOR.$path;
+    }
+
+    /** @param list<string> $arguments */
+    private function commandLineOption(array $arguments, string $name): ?string
+    {
+        foreach ($arguments as $index => $argument) {
+            if (str_starts_with($argument, "--{$name}=")) {
+                return substr($argument, strlen($name) + 3);
+            }
+            if ($argument === "--{$name}" && isset($arguments[$index + 1])) {
+                return $arguments[$index + 1];
+            }
+        }
+
+        return null;
     }
 }

@@ -13,6 +13,12 @@ it('does not require generated tests to bootstrap WordPress manually', function 
     }
 });
 
+it('bootstraps wordpress only for code tests', function (): void {
+    $pest = file_get_contents(__DIR__.'/../../examples/tests/Pest.php');
+
+    expect($pest)->toContain('shouldBootstrapWordPress', 'bootstrapWordPress');
+});
+
 it('uses WordPress-friendly browser assertions in generated tests', function (): void {
     $examples = [
         __DIR__.'/../../examples/tests/site/BrowserTest.php',

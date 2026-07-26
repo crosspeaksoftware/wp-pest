@@ -49,7 +49,9 @@ vendor/bin/pest --testsuite=Code
 vendor/bin/pest --testsuite=Browser
 ```
 
-The generated `tests/Pest.php` bootstraps WordPress before the tests execute.
+For plugin browser tests, `vendor/bin/pest --testsuite=Browser` automatically starts and stops the first generated matrix sandbox. Use `vendor/bin/wp-pest run --tests=browser --matrix=<name>` to select a particular combination, or `--matrix=all` to run every combination.
+
+The generated `tests/Pest.php` bootstraps WordPress before Code test files are discovered, while Browser-only runs skip the local WordPress fixture.
 It also increases Pest Browser's default wait timeout from five seconds to one minute.
 The generated browser tests assert that the page source includes a document body and that there are no JavaScript errors.
 
@@ -127,6 +129,8 @@ Only configure ZIP URLs that you trust: the downloaded plugin code is loaded and
 Every WordPress value, plugin-axis value, and profile is combined as a true Cartesian product. The example starts with 2 × 2 × 2 × 2 = 16 candidates and then applies the partial-match exclusion rules. `max_combinations` is checked after exclusions. Global `plugins.dependencies` are inherited by every profile; set `inherit_plugins` to `false`, add profile-only `plugins`, or remove inherited plugins with `exclude_plugins` when a compatibility suite needs a different environment.
 
 PHP is deliberately controlled by the PHP process running Pest, rather than being another configuration axis. Configure PHP versions in the job matrix of GitHub Actions or your CI system; within each PHP job, `wp-pest` expands every configured WordPress/plugin/profile combination.
+
+Browser sandboxes use the official WordPress image for the current PHP minor and then install the exact Composer-resolved WordPress matrix version into its shared volume. This avoids relying on Docker tags for every historical WordPress/PHP pairing.
 
 ## CLI
 

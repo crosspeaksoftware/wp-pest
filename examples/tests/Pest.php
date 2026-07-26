@@ -2,4 +2,6 @@
 
 pest()->browser()->timeout(60_000);
 
-wp_pest()->bootstrapWordPress();
+if (wp_pest()->shouldBootstrapWordPress() && ! wp_pest()->bootstrapWordPress()) {
+    throw new RuntimeException('wp-pest could not bootstrap WordPress.');
+}

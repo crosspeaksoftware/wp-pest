@@ -68,12 +68,59 @@ PHP);
 
     $config = (new ConfigLoader)->load($this->workspace);
     $manager = new SandboxManager($config, $this->workspace);
-    $path = $manager->writeCompose('default--wp-7.0.x');
+    putenv('WP_PEST_RESOLVED_WORDPRESS_VERSION=7.0.2');
 
-    expect($path)->toBeFile()
-        ->and(file_get_contents($path))->toContain('wordpress:php'.PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION.'-apache')
-        ->and(file_get_contents($path))->toContain('"8091:80"')
-        ->and(file_get_contents($path))->toContain('/plugin:/var/www/html/wp-content/plugins/plugin-under-test');
+    try {
+        $path = $manager->writeCompose('default--wp-7.0.x');
+
+        expect($path)->toBeFile()
+            ->and(file_get_contents($path))->toContain('wordpress:php'.PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION.'-apache')
+            ->and(file_get_contents($path))->not->toContain('wordpress:7.0.2-php')
+            ->and(file_get_contents($path))->toContain('user: "0:0"')
+            ->and(file_get_contents($path))->toContain('WORDPRESS_DEBUG: "1"', 'WP_DEBUG_LOG')
+            ->and(file_get_contents($path))->not->toContain('\\/proc\\/')
+            ->and(file_get_contents($path))->toContain('"8091:80"')
+            ->and(file_get_contents($path))->toContain('/plugin:/var/www/html/wp-content/plugins/plugin-under-test');
+    } finally {
+        putenv('WP_PEST_RESOLVED_WORDPRESS_VERSION');
+    }
+});
+
+it('downloads the exact resolved wordpress version into the browser volume', function (): void {
+    mkdir($this->workspace.'/plugin');
+    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+<?php
+
+return [
+    'target' => 'plugin',
+    'tests' => ['browser'],
+    'plugin' => ['path' => 'plugin'],
+    'matrix' => [
+        'wordpress' => ['^6.9'],
+        'profiles' => ['default' => ['tests' => ['browser']]],
+    ],
+];
+PHP);
+
+    putenv('WP_PEST_RESOLVED_WORDPRESS_VERSION=6.9.5');
+
+    try {
+        $config = (new ConfigLoader)->load($this->workspace);
+        $process = new SandboxRecordingProcess;
+        $manager = new SandboxManager($config, $this->workspace, $process);
+
+        expect($manager->start('default--wp-6.9'))->toBe(0);
+
+        $script = $process->commands[1][array_key_last($process->commands[1])];
+        expect($script)->toContain(
+            "php -d memory_limit=512M /usr/local/bin/wp core download --allow-root --force --version='6.9.5'",
+            'php -d memory_limit=512M /usr/local/bin/wp core is-installed --allow-root',
+            'until php -d memory_limit=512M /usr/local/bin/wp core install --allow-root',
+            'if [ "$attempt" -ge 30 ]; then exit 1; fi',
+        )->not->toContain('wp db check');
+    } finally {
+        putenv('WP_PEST_RESOLVED_WORDPRESS_VERSION');
+    }
 });
 
 it('installs and activates configured plugin dependencies in browser sandboxes', function (): void {

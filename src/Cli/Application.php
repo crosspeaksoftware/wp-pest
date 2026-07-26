@@ -134,7 +134,6 @@ final class Application
             'WP_PEST_TARGET',
             'WP_PEST_TESTS',
             'WP_PEST_WORDPRESS_PATH',
-            'WP_PEST_AUTO_BOOTSTRAP_WORDPRESS',
             'WP_PEST_MATRIX',
             'WP_PEST_ACTIVE_URL',
             'WP_PEST_RESOLVED_WORDPRESS_VERSION',
@@ -154,6 +153,13 @@ final class Application
     {
         $target = $this->option($arguments, 'target');
         $tests = $this->option($arguments, 'tests');
+        if ($tests === null) {
+            $suite = $this->option($arguments, 'testsuite');
+            $suiteTests = $suite === null ? [] : array_map('strtolower', array_map('trim', explode(',', $suite)));
+            if ($suiteTests !== [] && array_diff($suiteTests, ['code', 'browser']) === []) {
+                $tests = implode(',', $suiteTests);
+            }
+        }
         $pestArguments = $this->pestArguments($workingDirectory, $arguments, $tests);
 
         if ($target !== null) {
@@ -180,7 +186,6 @@ final class Application
 
                 putenv("WP_PEST_MATRIX={$name}");
                 putenv('WP_PEST_TESTS='.implode(',', $entryTests));
-                putenv('WP_PEST_AUTO_BOOTSTRAP_WORDPRESS='.(in_array('code', $entryTests, true) ? '1' : '0'));
                 putenv('WP_PEST_ACTIVE_URL');
 
                 $fixtureManager = new PluginFixture($config, $workingDirectory);
@@ -223,8 +228,6 @@ final class Application
         if ($tests !== null) {
             putenv("WP_PEST_TESTS={$tests}");
         }
-
-        putenv('WP_PEST_AUTO_BOOTSTRAP_WORDPRESS='.($config->hasCodeTests() ? '1' : '0'));
 
         return $this->process->run(array_merge([$this->pestBinary($workingDirectory)], $pestArguments), $workingDirectory, true);
     }
@@ -384,9 +387,12 @@ final class Application
      */
     private function option(array $arguments, string $name): ?string
     {
-        foreach ($arguments as $argument) {
+        foreach ($arguments as $index => $argument) {
             if (str_starts_with($argument, "--{$name}=")) {
                 return substr($argument, strlen($name) + 3);
+            }
+            if ($argument === "--{$name}" && isset($arguments[$index + 1])) {
+                return $arguments[$index + 1];
             }
         }
 
@@ -399,12 +405,32 @@ final class Application
      */
     private function pestArguments(string $workingDirectory, array $arguments, ?string $tests): array
     {
-        $arguments = array_values(array_filter(
-            $arguments,
-            fn (string $argument): bool => ! str_starts_with($argument, '--target=')
-                && ! str_starts_with($argument, '--tests=')
-                && ! str_starts_with($argument, '--matrix=')
-        ));
+        $filteredArguments = [];
+        $skipNext = false;
+        foreach ($arguments as $argument) {
+            if ($skipNext) {
+                $skipNext = false;
+
+                continue;
+            }
+
+            if (in_array($argument, ['--target', '--tests', '--matrix'], true)
+                || ($tests !== null && $argument === '--testsuite')) {
+                $skipNext = true;
+
+                continue;
+            }
+
+            if (str_starts_with($argument, '--target=')
+                || str_starts_with($argument, '--tests=')
+                || str_starts_with($argument, '--matrix=')
+                || ($tests !== null && str_starts_with($argument, '--testsuite='))) {
+                continue;
+            }
+
+            $filteredArguments[] = $argument;
+        }
+        $arguments = $filteredArguments;
 
         if ($tests === null || $tests === '') {
             return $arguments;

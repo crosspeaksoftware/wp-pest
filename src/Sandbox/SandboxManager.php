@@ -146,16 +146,31 @@ final class SandboxManager
             }
         }
 
-        $environment = '';
+        $containerEnvironment = [
+            'WORDPRESS_DB_HOST' => 'database',
+            'WORDPRESS_DB_NAME' => 'wordpress',
+            'WORDPRESS_DB_USER' => 'wordpress',
+            'WORDPRESS_DB_PASSWORD' => 'wordpress',
+            'WORDPRESS_DEBUG' => '1',
+            'WORDPRESS_CONFIG_EXTRA' => "define('WP_DEBUG_LOG', '/proc/1/fd/2');\ndefine('WP_DEBUG_DISPLAY', false);",
+        ];
         foreach ($entry->env() as $key => $value) {
-            $environment .= "      {$key}: ".json_encode($value, JSON_THROW_ON_ERROR)."\n";
+            if ($key === 'WORDPRESS_CONFIG_EXTRA') {
+                $containerEnvironment[$key] .= "\n{$value}";
+
+                continue;
+            }
+
+            $containerEnvironment[$key] = $value;
+        }
+
+        $environment = '';
+        foreach ($containerEnvironment as $key => $value) {
+            $environment .= "      {$key}: ".json_encode($value, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)."\n";
         }
 
         $php = PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION;
-        $resolvedWordpress = getenv('WP_PEST_RESOLVED_WORDPRESS_VERSION');
-        $wordpressImage = is_string($resolvedWordpress) && $resolvedWordpress !== ''
-            ? "wordpress:{$resolvedWordpress}-php{$php}-apache"
-            : "wordpress:php{$php}-apache";
+        $wordpressImage = "wordpress:php{$php}-apache";
 
         return <<<YAML
 services:
@@ -164,10 +179,6 @@ services:
     ports:
       - "{$port}:80"
     environment:
-      WORDPRESS_DB_HOST: database
-      WORDPRESS_DB_NAME: wordpress
-      WORDPRESS_DB_USER: wordpress
-      WORDPRESS_DB_PASSWORD: wordpress
 {$environment}    volumes:
       - wordpress:/var/www/html
       - {$pluginMount}:/var/www/html/wp-content/plugins/plugin-under-test
@@ -176,12 +187,9 @@ services:
 
   wpcli:
     image: wordpress:cli-php{$php}
+    user: "0:0"
     environment:
-      WORDPRESS_DB_HOST: database
-      WORDPRESS_DB_NAME: wordpress
-      WORDPRESS_DB_USER: wordpress
-      WORDPRESS_DB_PASSWORD: wordpress
-    volumes:
+{$environment}    volumes:
       - wordpress:/var/www/html
       - {$pluginMount}:/var/www/html/wp-content/plugins/plugin-under-test
 {$dependencyMounts}    depends_on:
@@ -217,20 +225,22 @@ YAML;
     private function setupWordPress(string $name): int
     {
         $url = $this->url($name);
+        $wp = 'php -d memory_limit=512M /usr/local/bin/wp';
+        $install = $wp.' core install --allow-root --url='.escapeshellarg($url).' --title='.escapeshellarg('WP Pest').' --admin_user=admin --admin_password=password --admin_email=admin@example.test --skip-email';
         $commands = [
-            'until wp db check --allow-root >/dev/null 2>&1; do sleep 2; done',
-            'wp core install --allow-root --url='.escapeshellarg($url).' --title='.escapeshellarg('WP Pest').' --admin_user=admin --admin_password=password --admin_email=admin@example.test --skip-email || true',
+            ...$this->wordpressInstallCommands($wp),
+            '{ if '.$wp.' core is-installed --allow-root; then true; else attempt=0; until '.$install.'; do attempt=$((attempt + 1)); if [ "$attempt" -ge 30 ]; then exit 1; fi; sleep 2; done; fi; }',
         ];
 
         foreach ($this->entry($name)->plugins() as $index => $dependency) {
             if ($dependency->isLocalPath() && is_dir($this->absolutePath($dependency->source()))) {
-                $commands[] = 'wp plugin activate '.escapeshellarg('dependency-'.$index).' --allow-root';
+                $commands[] = $wp.' plugin activate '.escapeshellarg('dependency-'.$index).' --allow-root';
 
                 continue;
             }
 
             if ($this->fixtureDependencyPath($dependency->slug()) !== null) {
-                $commands[] = 'wp plugin activate '.escapeshellarg($dependency->slug()).' --allow-root';
+                $commands[] = $wp.' plugin activate '.escapeshellarg($dependency->slug()).' --allow-root';
 
                 continue;
             }
@@ -239,13 +249,26 @@ YAML;
             $version = ! $dependency->isUrl() && preg_match('/^\d+(?:\.\d+)*(?:[-+][a-z0-9.-]+)?$/i', $dependency->version()) === 1
                 ? ' --version='.escapeshellarg($dependency->version())
                 : '';
-            $commands[] = 'wp plugin install '.escapeshellarg($source).$version.' --activate --force --allow-root';
+            $commands[] = $wp.' plugin install '.escapeshellarg($source).$version.' --activate --force --allow-root';
         }
 
-        $commands[] = 'wp plugin activate plugin-under-test --allow-root';
+        $commands[] = $wp.' plugin activate plugin-under-test --allow-root';
         $script = implode(' && ', $commands);
 
         return $this->compose($name, ['run', '--rm', 'wpcli', 'sh', '-lc', $script]);
+    }
+
+    /** @return list<string> */
+    private function wordpressInstallCommands(string $wp): array
+    {
+        $resolvedWordpress = getenv('WP_PEST_RESOLVED_WORDPRESS_VERSION');
+        if (! is_string($resolvedWordpress) || $resolvedWordpress === '') {
+            return [];
+        }
+
+        return [
+            $wp.' core download --allow-root --force --version='.escapeshellarg($resolvedWordpress),
+        ];
     }
 
     private function fixtureDependencyPath(string $slug): ?string

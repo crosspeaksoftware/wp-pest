@@ -108,6 +108,22 @@ it('runs only browser tests when requested', function (): void {
         ->and($process->commands[0])->toBe([$this->workspace.'/vendor/bin/pest', 'tests/Browser']);
 });
 
+it('translates the browser testsuite into an explicit test path', function (): void {
+    prepareRunWorkspace($this->workspace);
+    $process = new RecordingProcess;
+    $previous = getcwd();
+    chdir($this->workspace);
+
+    try {
+        $exitCode = (new Application($process))->run(['wp-pest', 'run', '--testsuite=Browser']);
+    } finally {
+        chdir($previous);
+    }
+
+    expect($exitCode)->toBe(0)
+        ->and($process->commands[0])->toBe([$this->workspace.'/vendor/bin/pest', 'tests/Browser']);
+});
+
 it('does not forward wp-pest options to pest', function (): void {
     prepareRunWorkspace($this->workspace);
     $process = new RecordingProcess;
