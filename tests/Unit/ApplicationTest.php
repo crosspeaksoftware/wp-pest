@@ -171,4 +171,11 @@ final class RecordingProcess implements ProcessRunner
 
         return 0;
     }
+
+    public function capture(array $command, ?string $cwd = null): string
+    {
+        $this->commands[] = $command;
+
+        return '';
+    }
 }

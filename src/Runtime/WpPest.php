@@ -157,6 +157,26 @@ final class WpPest
         return is_string($name) && $name !== '' ? $name : $this->config->activeMatrix()?->name();
     }
 
+    /**
+     * Run WP-CLI inside the active plugin browser sandbox.
+     *
+     * @param  list<string>  $arguments
+     */
+    public function wpCli(array $arguments): string
+    {
+        if ($this->target() !== 'plugin') {
+            throw new RuntimeException('WP-CLI sandbox commands are only available for plugin targets.');
+        }
+
+        $this->url();
+        $name = $this->matrixName();
+        if ($name === null) {
+            throw new RuntimeException('No active matrix sandbox is available.');
+        }
+
+        return (new SandboxManager($this->config, $this->workingDirectory))->wpCli($name, $arguments);
+    }
+
     /** @return array<string, mixed>|null */
     public function matrix(): ?array
     {

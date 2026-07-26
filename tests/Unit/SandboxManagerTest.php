@@ -210,6 +210,47 @@ PHP);
     }
 });
 
+it('runs wp-cli commands in a matrix sandbox and captures stdout', function (): void {
+    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+<?php
+
+return [
+    'target' => 'plugin',
+    'tests' => ['browser'],
+    'matrix' => [
+        'wordpress' => ['7.0'],
+        'profiles' => ['default' => ['tests' => ['browser']]],
+    ],
+];
+PHP);
+
+    $config = (new ConfigLoader)->load($this->workspace);
+    $process = new SandboxRecordingProcess;
+    $manager = new SandboxManager($config, $this->workspace, $process);
+
+    expect($manager->wpCli('default--wp-7.0', ['eval', 'echo "ready";']))->toBe('captured output');
+
+    expect($process->commands[0])->toBe([
+        'docker',
+        'compose',
+        '-p',
+        'wp-pest-'.basename($this->workspace).'-default--wp-7-0',
+        '-f',
+        $this->workspace.'/.wp-pest/sandboxes/default--wp-7.0/compose.yml',
+        'run',
+        '--rm',
+        '--no-deps',
+        'wpcli',
+        'php',
+        '-d',
+        'memory_limit=512M',
+        '/usr/local/bin/wp',
+        'eval',
+        'echo "ready";',
+        '--allow-root',
+    ]);
+});
+
 final class SandboxRecordingProcess implements ProcessRunner
 {
     /** @var list<list<string>> */
@@ -220,5 +261,12 @@ final class SandboxRecordingProcess implements ProcessRunner
         $this->commands[] = $command;
 
         return 0;
+    }
+
+    public function capture(array $command, ?string $cwd = null): string
+    {
+        $this->commands[] = $command;
+
+        return 'captured output';
     }
 }

@@ -55,6 +55,17 @@ The generated `tests/Pest.php` bootstraps WordPress before Code test files are d
 It also increases Pest Browser's default wait timeout from five seconds to one minute.
 The generated browser tests assert that the page source includes a document body and that there are no JavaScript errors.
 
+Browser tests for plugin targets can run WP-CLI inside the active matrix sandbox and capture its standard output. Pass each argument separately so commands and PHP snippets are escaped safely:
+
+```php
+$formId = wp_pest()->wpCli([
+    'eval',
+    '$form_id = GFAPI::add_form(["title" => "Test Form"]); echo $form_id;',
+]);
+```
+
+This is useful for seeding browser fixtures and inspecting raw WordPress or plugin database state after UI interactions.
+
 For plugin Code tests, the first run creates a real WordPress fixture under `.wp-pest/fixtures`, backed by the WordPress SQLite integration so no external database service is required. The fixture includes a minimal default theme, WordPress is installed, and the plugin under test is loaded before the Code suite runs.
 
 ## Configuration

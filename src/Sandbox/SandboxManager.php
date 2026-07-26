@@ -93,6 +93,23 @@ final class SandboxManager
         return "http://127.0.0.1:{$port}";
     }
 
+    /**
+     * Run WP-CLI inside the active sandbox and return its standard output.
+     *
+     * @param  list<string>  $arguments
+     */
+    public function wpCli(string $name, array $arguments): string
+    {
+        $command = array_merge(
+            $this->composeCommand($name),
+            ['run', '--rm', '--no-deps', 'wpcli', 'php', '-d', 'memory_limit=512M', '/usr/local/bin/wp'],
+            $arguments,
+            ['--allow-root']
+        );
+
+        return $this->process->capture($command, $this->workingDirectory);
+    }
+
     private function entry(string $name): MatrixCombination
     {
         foreach ($this->config->matrixCombinations() as $entry) {
@@ -109,10 +126,16 @@ final class SandboxManager
      */
     private function compose(string $name, array $arguments): int
     {
+        return $this->process->run(array_merge($this->composeCommand($name), $arguments), $this->workingDirectory, true);
+    }
+
+    /** @return list<string> */
+    private function composeCommand(string $name): array
+    {
         $compose = $this->sandboxDirectory($name).DIRECTORY_SEPARATOR.'compose.yml';
         $project = 'wp-pest-'.preg_replace('/[^a-z0-9_-]+/i', '-', basename($this->workingDirectory).'-'.$name);
 
-        return $this->process->run(array_merge(['docker', 'compose', '-p', $project, '-f', $compose], $arguments), $this->workingDirectory, true);
+        return ['docker', 'compose', '-p', $project, '-f', $compose];
     }
 
     private function sandboxDirectory(string $name): string
