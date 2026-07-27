@@ -49,7 +49,7 @@ vendor/bin/pest --testsuite=Code
 vendor/bin/pest --testsuite=Browser
 ```
 
-For plugin browser tests, `vendor/bin/pest --testsuite=Browser` automatically starts and stops the first generated matrix sandbox. Use `vendor/bin/wp-pest run --tests=browser --matrix=<name>` to select a particular combination, or `--matrix=all` to run every combination.
+For plugin browser tests, `vendor/bin/pest --testsuite=Browser` automatically starts and stops the first generated matrix sandbox. Test runs remove the selected sandbox's WordPress and database volumes before setup so every run starts from a clean installation. The exact WordPress core and dependency plugin packages remain cached in the matrix fixture and are copied into the fresh runtime volume, avoiding repeat downloads after the first run. Use `vendor/bin/wp-pest run --tests=browser --matrix=<name>` to select a particular combination, or `--matrix=all` to run every combination. Manual `sandbox:start` remains non-destructive; use `sandbox:reset` when you explicitly want to recreate a manually managed sandbox.
 
 The generated `tests/Pest.php` bootstraps WordPress before Code test files are discovered, while Browser-only runs skip the local WordPress fixture.
 It also increases Pest Browser's default wait timeout from five seconds to one minute.
@@ -66,7 +66,7 @@ $formId = wp_pest()->wpCli([
 
 This is useful for seeding browser fixtures and inspecting raw WordPress or plugin database state after UI interactions.
 
-For plugin Code tests, the first run creates a real WordPress fixture under `.wp-pest/fixtures`, backed by the WordPress SQLite integration so no external database service is required. The fixture includes a minimal default theme, WordPress is installed, and the plugin under test is loaded before the Code suite runs.
+For plugin Code tests, the first run creates a real WordPress fixture under `.wp-pest/fixtures`, backed by the WordPress SQLite integration so no external database service is required. The fixture installs Twenty Twenty-Five from WordPress.org as its default theme, WordPress is installed, and the plugin under test is loaded before the Code suite runs.
 
 ## Configuration
 

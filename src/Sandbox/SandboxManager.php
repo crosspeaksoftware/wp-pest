@@ -55,13 +55,27 @@ final class SandboxManager
         return $path;
     }
 
-    public function start(string $name): int
+    public function start(string $name, bool $fresh = false): int
     {
         $this->writeCompose($name);
+        $seededFromCache = false;
+
+        if ($fresh) {
+            $down = $this->compose($name, ['down', '--volumes', '--remove-orphans']);
+            if ($down !== 0) {
+                return $down;
+            }
+
+            $seed = $this->seedWordpressVolume($name);
+            if ($seed !== null && $seed !== 0) {
+                return $seed;
+            }
+            $seededFromCache = $seed === 0;
+        }
 
         $up = $this->compose($name, ['up', '-d']);
 
-        return $up === 0 ? $this->setupWordPress($name) : $up;
+        return $up === 0 ? $this->setupWordPress($name, $seededFromCache) : $up;
     }
 
     public function stop(string $name): int
@@ -155,6 +169,12 @@ final class SandboxManager
         $pluginPath = $this->config->pluginPath() ?? '.';
         $pluginMount = $this->absolutePath($pluginPath);
         $dependencyMounts = '';
+        $cacheMount = '';
+
+        $wordpressCache = getenv('WP_PEST_WORDPRESS_PATH');
+        if (is_string($wordpressCache) && is_dir($wordpressCache)) {
+            $cacheMount = "      - {$wordpressCache}:/wp-pest-cache/wordpress:ro\n";
+        }
 
         foreach ($entry->plugins() as $index => $dependency) {
             if ($dependency->isLocalPath() && is_dir($this->absolutePath($dependency->source()))) {
@@ -170,12 +190,13 @@ final class SandboxManager
         }
 
         $containerEnvironment = [
+            'HTTP_HOST' => "127.0.0.1:{$port}",
             'WORDPRESS_DB_HOST' => 'database',
             'WORDPRESS_DB_NAME' => 'wordpress',
             'WORDPRESS_DB_USER' => 'wordpress',
             'WORDPRESS_DB_PASSWORD' => 'wordpress',
             'WORDPRESS_DEBUG' => '1',
-            'WORDPRESS_CONFIG_EXTRA' => "define('WP_DEBUG_LOG', '/proc/1/fd/2');\ndefine('WP_DEBUG_DISPLAY', false);",
+            'WORDPRESS_CONFIG_EXTRA' => "define('WP_DEFAULT_THEME', 'twentytwentyfive');\ndefine('WP_DEBUG_LOG', '/proc/1/fd/2');\ndefine('WP_DEBUG_DISPLAY', false);",
         ];
         foreach ($entry->env() as $key => $value) {
             if ($key === 'WORDPRESS_CONFIG_EXTRA') {
@@ -215,7 +236,7 @@ services:
 {$environment}    volumes:
       - wordpress:/var/www/html
       - {$pluginMount}:/var/www/html/wp-content/plugins/plugin-under-test
-{$dependencyMounts}    depends_on:
+{$dependencyMounts}{$cacheMount}    depends_on:
       - database
       - wordpress
 
@@ -245,13 +266,21 @@ YAML;
         return $this->workingDirectory.DIRECTORY_SEPARATOR.$path;
     }
 
-    private function setupWordPress(string $name): int
+    private function setupWordPress(string $name, bool $seededFromCache = false): int
     {
         $url = $this->url($name);
         $wp = 'php -d memory_limit=512M /usr/local/bin/wp';
         $install = $wp.' core install --allow-root --url='.escapeshellarg($url).' --title='.escapeshellarg('WP Pest').' --admin_user=admin --admin_password=password --admin_email=admin@example.test --skip-email';
+        $databaseProbe = <<<'PHP'
+$socket = @fsockopen('database', 3306);
+if ($socket === false) {
+    exit(1);
+}
+fclose($socket);
+PHP;
         $commands = [
-            ...$this->wordpressInstallCommands($wp),
+            ...$this->wordpressInstallCommands($wp, $seededFromCache),
+            'attempt=0; until php -r '.escapeshellarg($databaseProbe).'; do attempt=$((attempt + 1)); if [ "$attempt" -ge 60 ]; then echo "Database did not become ready." >&2; exit 1; fi; sleep 1; done',
             '{ if '.$wp.' core is-installed --allow-root; then true; else attempt=0; until '.$install.'; do attempt=$((attempt + 1)); if [ "$attempt" -ge 30 ]; then exit 1; fi; sleep 2; done; fi; }',
         ];
 
@@ -282,8 +311,12 @@ YAML;
     }
 
     /** @return list<string> */
-    private function wordpressInstallCommands(string $wp): array
+    private function wordpressInstallCommands(string $wp, bool $seededFromCache): array
     {
+        if ($seededFromCache) {
+            return [];
+        }
+
         $resolvedWordpress = getenv('WP_PEST_RESOLVED_WORDPRESS_VERSION');
         if (! is_string($resolvedWordpress) || $resolvedWordpress === '') {
             return [];
@@ -292,6 +325,26 @@ YAML;
         return [
             $wp.' core download --allow-root --force --version='.escapeshellarg($resolvedWordpress),
         ];
+    }
+
+    /**
+     * Seed a fresh runtime volume from the exact WordPress fixture Composer already resolved.
+     *
+     * @return int|null Null when no usable cache is available.
+     */
+    private function seedWordpressVolume(string $name): ?int
+    {
+        $wordpressCache = getenv('WP_PEST_WORDPRESS_PATH');
+        if (! is_string($wordpressCache) || ! is_file($wordpressCache.DIRECTORY_SEPARATOR.'wp-load.php')) {
+            return null;
+        }
+
+        $script = 'mkdir -p /var/www/html/wp-content/themes'
+            .' && cp -a /wp-pest-cache/wordpress/wp-admin /wp-pest-cache/wordpress/wp-includes /var/www/html/'
+            .' && find /wp-pest-cache/wordpress -maxdepth 1 -type f ! -name wp-config.php -exec cp -a {} /var/www/html/ \\;'
+            .' && cp -a /wp-pest-cache/wordpress/wp-content/themes/. /var/www/html/wp-content/themes/';
+
+        return $this->compose($name, ['run', '--rm', '--no-deps', 'wpcli', 'sh', '-lc', $script]);
     }
 
     private function fixtureDependencyPath(string $slug): ?string

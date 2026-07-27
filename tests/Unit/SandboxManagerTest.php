@@ -77,6 +77,8 @@ PHP);
             ->and(file_get_contents($path))->toContain('wordpress:php'.PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION.'-apache')
             ->and(file_get_contents($path))->not->toContain('wordpress:7.0.2-php')
             ->and(file_get_contents($path))->toContain('user: "0:0"')
+            ->and(file_get_contents($path))->toContain('HTTP_HOST: "127.0.0.1:8091"')
+            ->and(file_get_contents($path))->toContain("define('WP_DEFAULT_THEME', 'twentytwentyfive');")
             ->and(file_get_contents($path))->toContain('WORDPRESS_DEBUG: "1"', 'WP_DEBUG_LOG')
             ->and(file_get_contents($path))->not->toContain('\\/proc\\/')
             ->and(file_get_contents($path))->toContain('"8091:80"')
@@ -114,11 +116,78 @@ PHP);
         $script = $process->commands[1][array_key_last($process->commands[1])];
         expect($script)->toContain(
             "php -d memory_limit=512M /usr/local/bin/wp core download --allow-root --force --version='6.9.5'",
+            'fsockopen',
+            'database',
+            'if [ "$attempt" -ge 60 ]; then echo "Database did not become ready."',
             'php -d memory_limit=512M /usr/local/bin/wp core is-installed --allow-root',
             'until php -d memory_limit=512M /usr/local/bin/wp core install --allow-root',
             'if [ "$attempt" -ge 30 ]; then exit 1; fi',
         )->not->toContain('wp db check');
     } finally {
+        putenv('WP_PEST_RESOLVED_WORDPRESS_VERSION');
+    }
+});
+
+it('removes sandbox volumes before a fresh start', function (): void {
+    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+<?php
+
+return [
+    'target' => 'plugin',
+    'tests' => ['browser'],
+    'matrix' => [
+        'wordpress' => ['7.0'],
+        'profiles' => ['default' => ['tests' => ['browser']]],
+    ],
+];
+PHP);
+
+    $config = (new ConfigLoader)->load($this->workspace);
+    $process = new SandboxRecordingProcess;
+    $manager = new SandboxManager($config, $this->workspace, $process);
+
+    expect($manager->start('default--wp-7.0', fresh: true))->toBe(0)
+        ->and($process->commands)->toHaveCount(3)
+        ->and($process->commands[0])->toContain('down', '--volumes', '--remove-orphans')
+        ->and($process->commands[1])->toContain('up', '-d')
+        ->and($process->commands[2])->toContain('run', '--rm', 'wpcli');
+});
+
+it('seeds a fresh wordpress volume from the resolved fixture cache', function (): void {
+    mkdir($this->workspace.'/cache/wp-admin', 0775, true);
+    mkdir($this->workspace.'/cache/wp-includes', 0775, true);
+    mkdir($this->workspace.'/cache/wp-content/themes/twentytwentyfive', 0775, true);
+    file_put_contents($this->workspace.'/cache/wp-load.php', '<?php');
+    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+<?php
+
+return [
+    'target' => 'plugin',
+    'tests' => ['browser'],
+    'matrix' => [
+        'wordpress' => ['7.0'],
+        'profiles' => ['default' => ['tests' => ['browser']]],
+    ],
+];
+PHP);
+
+    putenv('WP_PEST_WORDPRESS_PATH='.$this->workspace.'/cache');
+    putenv('WP_PEST_RESOLVED_WORDPRESS_VERSION=7.0.2');
+
+    try {
+        $config = (new ConfigLoader)->load($this->workspace);
+        $process = new SandboxRecordingProcess;
+        $manager = new SandboxManager($config, $this->workspace, $process);
+
+        expect($manager->start('default--wp-7.0', fresh: true))->toBe(0)
+            ->and($process->commands)->toHaveCount(4)
+            ->and($process->commands[1])->toContain('run', '--rm', '--no-deps', 'wpcli', 'sh', '-lc')
+            ->and($process->commands[1][array_key_last($process->commands[1])])->toContain('/wp-pest-cache/wordpress/wp-admin')
+            ->and($process->commands[3][array_key_last($process->commands[3])])->not->toContain('core download')
+            ->and(file_get_contents($this->workspace.'/.wp-pest/sandboxes/default--wp-7.0/compose.yml'))
+            ->toContain($this->workspace.'/cache:/wp-pest-cache/wordpress:ro');
+    } finally {
+        putenv('WP_PEST_WORDPRESS_PATH');
         putenv('WP_PEST_RESOLVED_WORDPRESS_VERSION');
     }
 });

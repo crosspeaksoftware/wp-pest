@@ -116,7 +116,7 @@ final class WpPest
         putenv($resolved === null ? 'WP_PEST_RESOLVED_WORDPRESS_VERSION' : "WP_PEST_RESOLVED_WORDPRESS_VERSION={$resolved}");
 
         $manager = new SandboxManager($this->config, $this->workingDirectory);
-        if ($manager->start($name) !== 0) {
+        if ($manager->start($name, fresh: true) !== 0) {
             throw new RuntimeException("Unable to start browser sandbox {$name}.");
         }
 

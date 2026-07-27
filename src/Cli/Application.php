@@ -196,7 +196,7 @@ final class Application
 
                 $browser = in_array('browser', $entryTests, true);
                 if ($browser) {
-                    $start = $manager->start($name);
+                    $start = $manager->start($name, fresh: true);
                     if ($start !== 0) {
                         return $start;
                     }

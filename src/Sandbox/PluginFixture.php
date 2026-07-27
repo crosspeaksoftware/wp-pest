@@ -45,8 +45,11 @@ final class PluginFixture
         $requirements = [
             'roots/wordpress' => $this->config->wordpressVersion(),
             'wpackagist-plugin/sqlite-database-integration' => '^2.2',
+            'wpackagist-theme/twentytwentyfive' => '*',
         ];
-        $installerPaths = [];
+        $installerPaths = [
+            'wordpress/wp-content/themes/{$name}/' => ['type:wordpress-theme'],
+        ];
 
         foreach ($this->config->dependencyPlugins() as $dependency) {
             if ($dependency->isLocalPath()) {
@@ -136,8 +139,6 @@ final class PluginFixture
         $sqlitePath = $contentPath.DIRECTORY_SEPARATOR.'plugins'.DIRECTORY_SEPARATOR.'sqlite-database-integration';
         $dropIn = $contentPath.DIRECTORY_SEPARATOR.'db.php';
 
-        $this->configureDefaultTheme($contentPath);
-
         if (! is_file($dropIn) && is_file($sqlitePath.DIRECTORY_SEPARATOR.'db.copy')) {
             copy($sqlitePath.DIRECTORY_SEPARATOR.'db.copy', $dropIn);
         }
@@ -145,10 +146,17 @@ final class PluginFixture
         $config = $wordpressPath.DIRECTORY_SEPARATOR.'wp-config.php';
         if (is_file($config)) {
             $contents = (string) file_get_contents($config);
-            if (! str_contains($contents, "define('WP_DEFAULT_THEME'")) {
+            if (str_contains($contents, "define('WP_DEFAULT_THEME'")) {
+                $contents = (string) preg_replace(
+                    "/define\\('WP_DEFAULT_THEME',\\s*'[^']+'\\);/",
+                    "define('WP_DEFAULT_THEME', 'twentytwentyfive');",
+                    $contents,
+                );
+                file_put_contents($config, $contents);
+            } else {
                 $contents = str_replace(
                     "define('WP_DEBUG', true);",
-                    "define('WP_DEFAULT_THEME', 'wp-pest');\ndefine('WP_DEBUG', true);",
+                    "define('WP_DEFAULT_THEME', 'twentytwentyfive');\ndefine('WP_DEBUG', true);",
                     $contents,
                 );
                 file_put_contents($config, $contents);
@@ -171,7 +179,7 @@ define('DB_DIR', __DIR__.'/.wp-pest');
 define('DB_FILE', 'wordpress.sqlite');
 define('WP_HOME', 'http://wp-pest.test');
 define('WP_SITEURL', 'http://wp-pest.test');
-define('WP_DEFAULT_THEME', 'wp-pest');
+define('WP_DEFAULT_THEME', 'twentytwentyfive');
 define('WP_DEBUG', true);
 define('WP_INSTALLING', true);
 
@@ -189,28 +197,5 @@ PHP;
         }
 
         file_put_contents($config, $contents.PHP_EOL);
-    }
-
-    private function configureDefaultTheme(string $contentPath): void
-    {
-        $themePath = $contentPath.DIRECTORY_SEPARATOR.'themes'.DIRECTORY_SEPARATOR.'wp-pest';
-        if (! is_dir($themePath)) {
-            mkdir($themePath, 0775, true);
-        }
-
-        $stylesheet = $themePath.DIRECTORY_SEPARATOR.'style.css';
-        if (! is_file($stylesheet)) {
-            file_put_contents($stylesheet, <<<'CSS'
-/*
-Theme Name: WP Pest
-Version: 1.0.0
-*/
-CSS);
-        }
-
-        $template = $themePath.DIRECTORY_SEPARATOR.'index.php';
-        if (! is_file($template)) {
-            file_put_contents($template, "<?php\n\ndeclare(strict_types=1);\n");
-        }
     }
 }

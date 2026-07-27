@@ -42,6 +42,7 @@ PHP);
         ->and($composer['require'])->toHaveKeys([
             'roots/wordpress',
             'wpackagist-plugin/sqlite-database-integration',
+            'wpackagist-theme/twentytwentyfive',
             'wpackagist-plugin/akismet',
         ])
         ->and(array_keys($composer['require']))->toContain(
@@ -52,17 +53,16 @@ PHP);
         ->toBe('https://plugins.example.test/gravityforms-2.10.5.zip')
         ->and($composer['extra']['installer-paths'])->toHaveKey('wordpress/wp-content/plugins/gravityforms/')
         ->and($composer['extra']['installer-paths'])->toHaveKey('wordpress/wp-content/plugins/{$name}/')
+        ->and($composer['extra']['installer-paths'])->toHaveKey('wordpress/wp-content/themes/{$name}/')
         ->and($composer['config']['allow-plugins']['composer/installers'])->toBeTrue()
         ->and($composer['config']['allow-plugins']['roots/wordpress-core-installer'])->toBeTrue()
         ->and($process->commands)->toBe([])
         ->and($contentPath.'/db.php')->toBeFile()
-        ->and($contentPath.'/themes/wp-pest/style.css')->toBeFile()
-        ->and($contentPath.'/themes/wp-pest/index.php')->toBeFile()
         ->and($fixturePath.'/wordpress/wp-config.php')->toBeFile()
         ->and(file_get_contents($fixturePath.'/wordpress/wp-config.php'))
         ->toContain(
             "define('DB_FILE', 'wordpress.sqlite');",
-            "define('WP_DEFAULT_THEME', 'wp-pest');",
+            "define('WP_DEFAULT_THEME', 'twentytwentyfive');",
             "define('WP_INSTALLING', true);",
         );
 });
