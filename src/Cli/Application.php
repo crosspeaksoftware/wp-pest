@@ -271,7 +271,22 @@ final class Application
 
     private function socketsExtensionMessage(): string
     {
-        return 'The PHP function socket_create_listen() required by Pest Browser is unavailable. Make it available to the PHP CLI running wp-pest; Code-only tests do not require it.';
+        $disabledFunctions = array_map('trim', explode(',', (string) ini_get('disable_functions')));
+        $disabledNotice = in_array('socket_create_listen', $disabledFunctions, true)
+            ? ' It is listed in disable_functions.'
+            : '';
+        $loadedIni = php_ini_loaded_file() ?: '(none)';
+        $scannedIni = trim((string) php_ini_scanned_files()) ?: '(none)';
+        $scannedIni = str_replace("\n", ', ', $scannedIni);
+
+        return sprintf(
+            'The PHP function socket_create_listen() required by Pest Browser is unavailable in %s (PHP %s).%s Check that php has the sockets extension enabled. Loaded INI: %s; scanned INI files: %s. Code-only tests do not require it.',
+            PHP_BINARY,
+            PHP_VERSION,
+            $disabledNotice,
+            $loadedIni,
+            $scannedIni,
+        );
     }
 
     private function matrixList(string $workingDirectory): int
