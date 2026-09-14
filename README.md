@@ -66,6 +66,28 @@ $formId = wp_pest()->wpCli([
 
 This is useful for seeding browser fixtures and inspecting raw WordPress or plugin database state after UI interactions.
 
+For browser tests, wp-pest also provides namespaced helpers for the common sandbox operations:
+
+```php
+use function CrossPeak\WpPest\{actingAsAdmin, wpEval};
+
+$form = wpEval(<<<'PHP'
+$form_id = GFAPI::add_form(['title' => 'Test Form']);
+$page_id = wp_insert_post([
+    'post_title' => 'Test Form',
+    'post_content' => '[gravityform id="'.$form_id.'" title="false"]',
+    'post_status' => 'publish',
+    'post_type' => 'page',
+]);
+
+return ['form_id' => $form_id, 'url' => get_permalink($page_id)];
+PHP);
+
+actingAsAdmin()->navigate($form['url']);
+```
+
+`wpEval()` runs the provided PHP body in the active plugin sandbox with `$wpdb` available and returns its JSON-compatible result. It is intended for browser-test setup and inspection; use `wp_pest()->wpCli()` when the full WP-CLI output or a non-PHP CLI command is needed. `actingAsAdmin()` is limited to plugin browser sandboxes, logs in with the seeded `admin` / `password` account, and returns the browser page for chaining. It requires the optional Pest Browser plugin.
+
 For plugin Code tests, the first run creates a real WordPress fixture under `.wp-pest/fixtures`, backed by the WordPress SQLite integration so no external database service is required. The fixture installs Twenty Twenty-Five from WordPress.org as its default theme, WordPress is installed, and the plugin under test is loaded before the Code suite runs.
 
 ## Configuration
@@ -170,6 +192,7 @@ wp_pest()->wordpressPath();
 wp_pest()->pluginPath();
 wp_pest()->matrixName();
 wp_pest()->matrix();
+wp_pest()->wpCli(['plugin', 'list']);
 wp_pest()->phpVersion();
 wp_pest()->phpVersionIs('>=8.3');
 wp_pest()->wordpressVersion();
@@ -179,6 +202,8 @@ wp_pest()->pluginVersion('gravityforms');
 wp_pest()->pluginVersionIs('gravityforms', '>=2.10.5');
 wp_pest()->bootstrapWordPress(); // manual fallback for custom runners
 ```
+
+For Pest-style helpers, import `CrossPeak\WpPest\actingAsAdmin` and `CrossPeak\WpPest\wpEval` as shown above.
 
 These Boolean helpers make version- or dependency-specific skips straightforward:
 

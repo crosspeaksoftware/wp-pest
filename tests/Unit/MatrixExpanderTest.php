@@ -16,9 +16,9 @@ return [
     'matrix' => [
         'wordpress' => ['6.9.*', '7.0.*'],
         'plugins' => [
-            'gravityforms' => [
-                ['version' => '2.10.4', 'url' => 'https://example.test/gravityforms-2.10.4.zip'],
-                ['version' => '2.10.5', 'url' => 'https://example.test/gravityforms-2.10.5.zip'],
+            'sample-plugin' => [
+                ['version' => '1.2.3', 'url' => 'https://example.test/sample-plugin-1.2.3.zip'],
+                ['version' => '1.2.4', 'url' => 'https://example.test/sample-plugin-1.2.4.zip'],
             ],
             'query-monitor' => ['3.19.0', '3.20.0'],
         ],
@@ -34,16 +34,16 @@ PHP);
     $combinations = $config->matrixCombinations();
 
     expect($combinations)->toHaveCount(16)
-        ->and($combinations[0]->name())->toBe('code--wp-6.9.x--gravityforms-2.10.4--query-monitor-3.19.0')
+        ->and($combinations[0]->name())->toBe('code--wp-6.9.x--sample-plugin-1.2.3--query-monitor-3.19.0')
         ->and($combinations[0]->pluginVersions())->toBe([
             'akismet' => '*',
-            'gravityforms' => '2.10.4',
+            'sample-plugin' => '1.2.3',
             'query-monitor' => '3.19.0',
         ])
         ->and($combinations[8]->tests())->toBe(['browser'])
         ->and($config->wordpressVersion())->toBe('6.9.*')
         ->and(array_map(static fn ($plugin): string => $plugin->slug(), $config->dependencyPlugins()))
-        ->toBe(['akismet', 'gravityforms', 'query-monitor']);
+        ->toBe(['akismet', 'sample-plugin', 'query-monitor']);
 });
 
 it('applies partial exclusion rules before enforcing the combination limit', function (): void {
@@ -55,14 +55,14 @@ return [
     'plugin' => ['path' => '.'],
     'matrix' => [
         'wordpress' => ['6.9', '7.0'],
-        'plugins' => ['gravityforms' => ['2.10.4', '2.10.5']],
+        'plugins' => ['sample-plugin' => ['1.2.3', '1.2.4']],
         'profiles' => [
             'default' => ['tests' => ['code']],
             'compat' => ['tests' => ['code'], 'groups' => ['compat']],
         ],
         'exclude' => [
             ['wordpress' => '6.9'],
-            ['profile' => 'compat', 'plugins' => ['gravityforms' => '2.10.4']],
+            ['profile' => 'compat', 'plugins' => ['sample-plugin' => '1.2.3']],
         ],
         'max_combinations' => 3,
     ],
@@ -72,9 +72,9 @@ PHP);
     $combinations = (new ConfigLoader)->load($this->workspace)->matrixCombinations();
 
     expect(array_map(static fn ($combination): string => $combination->name(), $combinations))->toBe([
-        'default--wp-7.0--gravityforms-2.10.4',
-        'default--wp-7.0--gravityforms-2.10.5',
-        'compat--wp-7.0--gravityforms-2.10.5',
+        'default--wp-7.0--sample-plugin-1.2.3',
+        'default--wp-7.0--sample-plugin-1.2.4',
+        'compat--wp-7.0--sample-plugin-1.2.4',
     ]);
 });
 
@@ -107,6 +107,35 @@ PHP);
         ->and($combination->groups())->toBe(['woocommerce']);
 });
 
+it('uses profile-overridden plugin versions in generated matrix names', function (): void {
+    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+<?php
+
+return [
+    'target' => 'plugin',
+    'matrix' => [
+        'wordpress' => ['6.9'],
+        'plugins' => ['sample-plugin' => ['1.2.4']],
+        'profiles' => [
+            'signature-compatible' => [
+                'tests' => ['browser'],
+                'plugins' => [[
+                    'slug' => 'sample-plugin',
+                    'version' => '2.0.0',
+                    'url' => 'https://example.test/sample-plugin-2.0.0.zip',
+                ]],
+            ],
+        ],
+    ],
+];
+PHP);
+
+    $combination = (new ConfigLoader)->load($this->workspace)->matrixCombinations()[0];
+
+    expect($combination->name())->toBe('signature-compatible--wp-6.9--sample-plugin-2.0.0')
+        ->and($combination->pluginVersions())->toBe(['sample-plugin' => '2.0.0']);
+});
+
 it('rejects exclusions that reference unknown dimensions', function (): void {
     file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
 <?php
@@ -116,15 +145,15 @@ return [
     'plugin' => ['path' => '.'],
     'matrix' => [
         'wordpress' => ['7.0'],
-        'plugins' => ['gravityforms' => ['2.10.5']],
+        'plugins' => ['sample-plugin' => ['1.2.4']],
         'profiles' => ['default' => ['tests' => ['code']]],
-        'exclude' => [['plugins' => ['gravityforms' => '1.0']]],
+        'exclude' => [['plugins' => ['sample-plugin' => '0.9.0']]],
     ],
 ];
 PHP);
 
     (new ConfigLoader)->load($this->workspace);
-})->throws(ValidationException::class, 'unknown version 1.0');
+})->throws(ValidationException::class, 'unknown version 0.9.0');
 
 it('rejects matrices above the configured post-exclusion limit', function (): void {
     file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'

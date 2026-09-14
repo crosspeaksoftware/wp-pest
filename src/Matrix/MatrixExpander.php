@@ -74,7 +74,12 @@ final class MatrixExpander
                         throw new ValidationException(["Matrix expands to more than {$max} combinations after exclusions. Add exclusions or raise max_combinations."]);
                     }
 
-                    $name = $this->name((string) $profileName, (string) $wordpress, $versions);
+                    $nameVersions = $versions;
+                    foreach ($nameVersions as $slug => $version) {
+                        $nameVersions[$slug] = $effectiveVersions[$slug] ?? $version;
+                    }
+
+                    $name = $this->name((string) $profileName, (string) $wordpress, $nameVersions);
                     if (isset($combinations[$name])) {
                         $name .= '--'.substr(sha1($fingerprint), 0, 8);
                     }

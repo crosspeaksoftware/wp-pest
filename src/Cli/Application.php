@@ -196,6 +196,8 @@ final class Application
                     continue;
                 }
 
+                fwrite(STDOUT, PHP_EOL.'wp-pest matrix: '.$name.' (tests: '.implode(', ', $entryTests).')'.PHP_EOL);
+
                 putenv("WP_PEST_MATRIX={$name}");
                 putenv('WP_PEST_TESTS='.implode(',', $entryTests));
                 putenv('WP_PEST_ACTIVE_URL');

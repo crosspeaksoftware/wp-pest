@@ -19,7 +19,8 @@
       "CrossPeak\\WpPest\\": "src/"
     },
     "files": [
-      "src/Runtime/functions.php"
+      "src/Runtime/functions.php",
+      "src/functions.php"
     ]
   },
   "autoload-dev": {

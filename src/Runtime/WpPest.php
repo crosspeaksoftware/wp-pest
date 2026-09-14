@@ -209,12 +209,35 @@ final class WpPest
 
     public function hasPlugin(string $slug): bool
     {
-        return array_key_exists($this->normalizeSlug($slug), $this->loadedPlugins);
+        $slug = $this->normalizeSlug($slug);
+        if (array_key_exists($slug, $this->loadedPlugins)) {
+            return true;
+        }
+
+        foreach ($this->config->dependencyPlugins() as $plugin) {
+            if ($plugin->slug() === $slug) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function pluginVersion(string $slug): ?string
     {
-        return $this->loadedPlugins[$this->normalizeSlug($slug)] ?? null;
+        $slug = $this->normalizeSlug($slug);
+        $loadedVersion = $this->loadedPlugins[$slug] ?? null;
+        if ($loadedVersion !== null) {
+            return $loadedVersion;
+        }
+
+        foreach ($this->config->dependencyPlugins() as $plugin) {
+            if ($plugin->slug() === $slug) {
+                return $plugin->version() === '*' ? null : $plugin->version();
+            }
+        }
+
+        return null;
     }
 
     public function pluginVersionIs(string $slug, string $constraint): bool

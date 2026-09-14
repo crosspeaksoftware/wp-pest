@@ -16,23 +16,23 @@ it('normalizes WPackagist plugin slugs', function (): void {
 
 it('normalizes explicit ZIP plugin definitions', function (): void {
     $dependency = PluginDependency::from([
-        'slug' => 'gravityforms',
-        'version' => '2.10.5',
-        'url' => 'https://plugins.example.test/gravityforms-2.10.5.zip',
+        'slug' => 'sample-plugin',
+        'version' => '1.2.3',
+        'url' => 'https://plugins.example.test/sample-plugin-1.2.3.zip',
     ]);
 
     expect($dependency->isUrl())->toBeTrue()
-        ->and($dependency->slug())->toBe('gravityforms')
-        ->and($dependency->source())->toBe('https://plugins.example.test/gravityforms-2.10.5.zip')
-        ->and($dependency->version())->toBe('2.10.5')
-        ->and($dependency->packageName())->toStartWith('wp-pest-plugin/gravityforms-');
+        ->and($dependency->slug())->toBe('sample-plugin')
+        ->and($dependency->source())->toBe('https://plugins.example.test/sample-plugin-1.2.3.zip')
+        ->and($dependency->version())->toBe('1.2.3')
+        ->and($dependency->packageName())->toStartWith('wp-pest-plugin/sample-plugin-');
 });
 
 it('infers plugin slugs and versions from ZIP URLs', function (): void {
-    $dependency = PluginDependency::from('https://plugins.example.test/gravityforms-2.10.5.zip');
+    $dependency = PluginDependency::from('https://plugins.example.test/sample-plugin-1.2.3.zip');
 
-    expect($dependency->slug())->toBe('gravityforms')
-        ->and($dependency->version())->toBe('2.10.5');
+    expect($dependency->slug())->toBe('sample-plugin')
+        ->and($dependency->version())->toBe('1.2.3');
 });
 
 it('preserves local plugin paths', function (): void {

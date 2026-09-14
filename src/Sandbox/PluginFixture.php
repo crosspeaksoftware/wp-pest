@@ -111,6 +111,7 @@ final class PluginFixture
             throw new ValidationException(["Composer could not install WordPress fixture {$path}."]);
         }
 
+        $this->normalizePluginDirectories($wordpressPath);
         $this->configureWordPress($wordpressPath);
 
         return $path;
@@ -197,5 +198,52 @@ PHP;
         }
 
         file_put_contents($config, $contents.PHP_EOL);
+    }
+
+    /**
+     * Some premium plugin ZIPs contain a redundant plugin-named directory
+     * inside the archive. Composer already installs the package into that
+     * directory, so flatten this common packaging mistake for WordPress.
+     */
+    private function normalizePluginDirectories(string $wordpressPath): void
+    {
+        $pluginsPath = $wordpressPath.DIRECTORY_SEPARATOR.'wp-content'.DIRECTORY_SEPARATOR.'plugins';
+
+        foreach ($this->config->dependencyPlugins() as $dependency) {
+            if ($dependency->isLocalPath()) {
+                continue;
+            }
+
+            $pluginPath = $pluginsPath.DIRECTORY_SEPARATOR.$dependency->slug();
+            if (! is_dir($pluginPath) || glob($pluginPath.DIRECTORY_SEPARATOR.'*.php') !== []) {
+                continue;
+            }
+
+            $nestedPluginPaths = array_values(array_filter(
+                glob($pluginPath.DIRECTORY_SEPARATOR.'*', GLOB_ONLYDIR) ?: [],
+                static fn (string $directory): bool => glob($directory.DIRECTORY_SEPARATOR.'*.php') !== [],
+            ));
+
+            if (count($nestedPluginPaths) !== 1) {
+                continue;
+            }
+
+            $nestedPluginPath = $nestedPluginPaths[0];
+            foreach (scandir($nestedPluginPath) ?: [] as $item) {
+                if ($item === '.' || $item === '..') {
+                    continue;
+                }
+
+                $source = $nestedPluginPath.DIRECTORY_SEPARATOR.$item;
+                $destination = $pluginPath.DIRECTORY_SEPARATOR.$item;
+                if (file_exists($destination) || ! rename($source, $destination)) {
+                    throw new ValidationException(["Could not normalize the plugin directory {$pluginPath}."]);
+                }
+            }
+
+            if (! rmdir($nestedPluginPath)) {
+                throw new ValidationException(["Could not remove the redundant plugin directory {$nestedPluginPath}."]);
+            }
+        }
     }
 }
