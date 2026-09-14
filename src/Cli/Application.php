@@ -8,6 +8,7 @@ use CrossPeak\WpPest\Config\Config;
 use CrossPeak\WpPest\Config\ConfigLoader;
 use CrossPeak\WpPest\Config\ValidationException;
 use CrossPeak\WpPest\Matrix\MatrixCombination;
+use CrossPeak\WpPest\Sandbox\DockerCompose;
 use CrossPeak\WpPest\Sandbox\PluginFixture;
 use CrossPeak\WpPest\Sandbox\SandboxManager;
 use CrossPeak\WpPest\Support\Process;
@@ -108,8 +109,12 @@ final class Application
             $errors[] = 'node is required for Pest browser testing.';
         }
 
-        if ($config->target() === 'plugin' && $hasBrowserTests && ! $this->commandExists('docker')) {
-            $errors[] = 'docker is required for plugin browser sandboxes.';
+        if ($config->target() === 'plugin' && $hasBrowserTests) {
+            try {
+                DockerCompose::command($this->process);
+            } catch (ValidationException $exception) {
+                $errors = [...$errors, ...$exception->errors()];
+            }
         }
 
         if ($errors !== []) {

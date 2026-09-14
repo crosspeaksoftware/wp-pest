@@ -12,6 +12,9 @@ use CrossPeak\WpPest\Support\ProcessRunner;
 
 final class SandboxManager
 {
+    /** @var list<string>|null */
+    private ?array $composeCommand = null;
+
     public function __construct(
         private readonly Config $config,
         private readonly string $workingDirectory,
@@ -149,7 +152,9 @@ final class SandboxManager
         $compose = $this->sandboxDirectory($name).DIRECTORY_SEPARATOR.'compose.yml';
         $project = 'wp-pest-'.preg_replace('/[^a-z0-9_-]+/i', '-', basename($this->workingDirectory).'-'.$name);
 
-        return ['docker', 'compose', '-p', $project, '-f', $compose];
+        $this->composeCommand ??= DockerCompose::command($this->process);
+
+        return [...$this->composeCommand, '-p', $project, '-f', $compose];
     }
 
     private function sandboxDirectory(string $name): string

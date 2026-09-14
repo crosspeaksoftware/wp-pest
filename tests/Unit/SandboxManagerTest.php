@@ -299,7 +299,7 @@ PHP);
 
     expect($manager->wpCli('default--wp-7.0', ['eval', 'echo "ready";']))->toBe('captured output');
 
-    expect($process->commands[0])->toBe([
+    expect($process->captureCommands[1])->toBe([
         'docker',
         'compose',
         '-p',
@@ -325,6 +325,9 @@ final class SandboxRecordingProcess implements ProcessRunner
     /** @var list<list<string>> */
     public array $commands = [];
 
+    /** @var list<list<string>> */
+    public array $captureCommands = [];
+
     public function run(array $command, ?string $cwd = null, bool $passthru = false): int
     {
         $this->commands[] = $command;
@@ -334,7 +337,11 @@ final class SandboxRecordingProcess implements ProcessRunner
 
     public function capture(array $command, ?string $cwd = null): string
     {
-        $this->commands[] = $command;
+        $this->captureCommands[] = $command;
+
+        if ($command === ['docker', 'compose', 'version']) {
+            return 'Docker Compose version v2.0.0';
+        }
 
         return 'captured output';
     }
