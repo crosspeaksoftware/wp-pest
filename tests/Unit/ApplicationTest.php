@@ -140,6 +140,57 @@ it('does not forward wp-pest options to pest', function (): void {
         ->and($process->commands[0])->toBe([$this->workspace.'/vendor/bin/pest', 'tests/Code', '--filter=home']);
 });
 
+it('explains that socket_create_listen() is required before browser tests start', function (): void {
+    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+<?php
+
+return [
+    'target' => 'site',
+    'tests' => ['browser'],
+    'site' => ['url' => 'https://example.test'],
+];
+PHP);
+
+    $workspace = $this->workspace;
+    $runWithoutSockets = static function (array $arguments) use ($workspace): array {
+        $autoload = dirname(__DIR__, 2).'/vendor/autoload.php';
+        $script = 'require '.var_export($autoload, true).'; chdir('.var_export($workspace, true).'); exit((new \\CrossPeak\\WpPest\\Cli\\Application)->run('.var_export(['wp-pest', ...$arguments], true).'));';
+        exec(escapeshellarg(PHP_BINARY).' -n -r '.escapeshellarg($script).' 2>&1', $output, $exitCode);
+
+        return [$exitCode, implode("\n", $output)];
+    };
+
+    [$doctorExitCode, $doctorOutput] = $runWithoutSockets(['doctor']);
+    [$runExitCode, $runOutput] = $runWithoutSockets(['run', '--tests=browser']);
+
+    expect($doctorExitCode)->toBe(1)
+        ->and($doctorOutput)->toContain('socket_create_listen()', 'Code-only tests do not require it')
+        ->and($runExitCode)->toBe(1)
+        ->and($runOutput)->toContain('socket_create_listen()', 'Code-only tests do not require it');
+});
+
+it('allows Code-only runs without socket functions', function (): void {
+    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+<?php
+
+return [
+    'target' => 'site',
+    'tests' => ['code', 'browser'],
+    'site' => ['url' => 'https://example.test'],
+];
+PHP);
+    mkdir($this->workspace.'/vendor/bin', 0775, true);
+    file_put_contents($this->workspace.'/vendor/bin/pest', "#!/bin/sh\nexit 0\n");
+    chmod($this->workspace.'/vendor/bin/pest', 0775);
+
+    $autoload = dirname(__DIR__, 2).'/vendor/autoload.php';
+    $script = 'require '.var_export($autoload, true).'; chdir('.var_export($this->workspace, true).'); exit((new \\CrossPeak\\WpPest\\Cli\\Application)->run(["wp-pest", "run", "--tests=code"]));';
+    exec(escapeshellarg(PHP_BINARY).' -n -r '.escapeshellarg($script).' 2>&1', $output, $exitCode);
+
+    expect($exitCode)->toBe(0)
+        ->and(implode("\n", $output))->not->toContain('socket_create_listen()');
+});
+
 function prepareRunWorkspace(string $workspace): void
 {
     mkdir($workspace.'/tests/Code', 0775, true);

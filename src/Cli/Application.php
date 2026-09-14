@@ -109,6 +109,10 @@ final class Application
             $errors[] = 'node is required for Pest browser testing.';
         }
 
+        if ($hasBrowserTests && ! function_exists('socket_create_listen')) {
+            $errors[] = $this->socketsExtensionMessage();
+        }
+
         if ($config->target() === 'plugin' && $hasBrowserTests) {
             try {
                 DockerCompose::command($this->process);
@@ -176,15 +180,18 @@ final class Application
 
         if ($config->target() === 'plugin') {
             $manager = new SandboxManager($config, $workingDirectory);
+            $matrixNames = $manager->matrixNames($matrix);
+
+            foreach ($matrixNames as $name) {
+                $entryTests = $this->selectedTests($this->matrixEntry($config, $name)->tests(), $tests);
+                $this->assertBrowserRequirements($entryTests);
+            }
+
             $exitCode = 0;
 
-            foreach ($manager->matrixNames($matrix) as $name) {
+            foreach ($matrixNames as $name) {
                 $entry = $this->matrixEntry($config, $name);
-                $entryTests = $entry->tests();
-                if ($tests !== null && $tests !== '') {
-                    $requested = array_map('trim', explode(',', $tests));
-                    $entryTests = array_values(array_intersect($entryTests, $requested));
-                }
+                $entryTests = $this->selectedTests($entry->tests(), $tests);
                 if ($entryTests === []) {
                     continue;
                 }
@@ -230,11 +237,41 @@ final class Application
             return $exitCode;
         }
 
+        $this->assertBrowserRequirements($this->selectedTests($config->tests(), $tests));
+
         if ($tests !== null) {
             putenv("WP_PEST_TESTS={$tests}");
         }
 
         return $this->process->run(array_merge([$this->pestBinary($workingDirectory)], $pestArguments), $workingDirectory, true);
+    }
+
+    /**
+     * @param  list<string>  $configuredTests
+     * @return list<string>
+     */
+    private function selectedTests(array $configuredTests, ?string $requestedTests): array
+    {
+        if ($requestedTests === null || $requestedTests === '') {
+            return $configuredTests;
+        }
+
+        return array_values(array_intersect($configuredTests, array_map('trim', explode(',', $requestedTests))));
+    }
+
+    /**
+     * @param  list<string>  $tests
+     */
+    private function assertBrowserRequirements(array $tests): void
+    {
+        if (in_array('browser', $tests, true) && ! function_exists('socket_create_listen')) {
+            throw new ValidationException([$this->socketsExtensionMessage()]);
+        }
+    }
+
+    private function socketsExtensionMessage(): string
+    {
+        return 'The PHP function socket_create_listen() required by Pest Browser is unavailable. Make it available to the PHP CLI running wp-pest; Code-only tests do not require it.';
     }
 
     private function matrixList(string $workingDirectory): int
