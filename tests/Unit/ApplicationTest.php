@@ -89,7 +89,7 @@ it('runs only code tests when requested', function (): void {
     }
 
     expect($exitCode)->toBe(0)
-        ->and($process->commands[0])->toBe([$this->workspace.'/vendor/bin/pest', 'tests/Code']);
+        ->and($process->commands[0])->toBe([PHP_BINARY, $this->workspace.'/vendor/bin/pest', 'tests/Code']);
 });
 
 it('runs only browser tests when requested', function (): void {
@@ -105,7 +105,7 @@ it('runs only browser tests when requested', function (): void {
     }
 
     expect($exitCode)->toBe(0)
-        ->and($process->commands[0])->toBe([$this->workspace.'/vendor/bin/pest', 'tests/Browser']);
+        ->and($process->commands[0])->toBe([PHP_BINARY, $this->workspace.'/vendor/bin/pest', 'tests/Browser']);
 });
 
 it('translates the browser testsuite into an explicit test path', function (): void {
@@ -121,7 +121,7 @@ it('translates the browser testsuite into an explicit test path', function (): v
     }
 
     expect($exitCode)->toBe(0)
-        ->and($process->commands[0])->toBe([$this->workspace.'/vendor/bin/pest', 'tests/Browser']);
+        ->and($process->commands[0])->toBe([PHP_BINARY, $this->workspace.'/vendor/bin/pest', 'tests/Browser']);
 });
 
 it('does not forward wp-pest options to pest', function (): void {
@@ -137,7 +137,7 @@ it('does not forward wp-pest options to pest', function (): void {
     }
 
     expect($exitCode)->toBe(0)
-        ->and($process->commands[0])->toBe([$this->workspace.'/vendor/bin/pest', 'tests/Code', '--filter=home']);
+        ->and($process->commands[0])->toBe([PHP_BINARY, $this->workspace.'/vendor/bin/pest', 'tests/Code', '--filter=home']);
 });
 
 it('explains that socket_create_listen() is required before browser tests start', function (): void {
@@ -180,8 +180,7 @@ return [
 ];
 PHP);
     mkdir($this->workspace.'/vendor/bin', 0775, true);
-    file_put_contents($this->workspace.'/vendor/bin/pest', "#!/bin/sh\nexit 0\n");
-    chmod($this->workspace.'/vendor/bin/pest', 0775);
+    file_put_contents($this->workspace.'/vendor/bin/pest', "<?php\nexit(0);\n");
 
     $autoload = dirname(__DIR__, 2).'/vendor/autoload.php';
     $script = 'require '.var_export($autoload, true).'; chdir('.var_export($this->workspace, true).'); exit((new \\CrossPeak\\WpPest\\Cli\\Application)->run(["wp-pest", "run", "--tests=code"]));';

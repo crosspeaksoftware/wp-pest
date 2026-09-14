@@ -222,7 +222,7 @@ final class Application
                 }
 
                 try {
-                    $exitCode = $this->process->run(array_merge([$this->pestBinary($workingDirectory)], $entryArguments), $workingDirectory, true);
+                    $exitCode = $this->process->run(array_merge([PHP_BINARY, $this->pestBinary($workingDirectory)], $entryArguments), $workingDirectory, true);
                 } finally {
                     if ($browser) {
                         $manager->stop($name);
@@ -243,7 +243,7 @@ final class Application
             putenv("WP_PEST_TESTS={$tests}");
         }
 
-        return $this->process->run(array_merge([$this->pestBinary($workingDirectory)], $pestArguments), $workingDirectory, true);
+        return $this->process->run(array_merge([PHP_BINARY, $this->pestBinary($workingDirectory)], $pestArguments), $workingDirectory, true);
     }
 
     /**
