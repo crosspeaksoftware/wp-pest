@@ -107,7 +107,7 @@ final class SandboxManager
             $port = 8080 + abs(crc32($name)) % 1000;
         }
 
-        return "http://127.0.0.1:{$port}";
+        return "http://{$this->browserHost()}:{$port}";
     }
 
     /**
@@ -195,7 +195,7 @@ final class SandboxManager
         }
 
         $containerEnvironment = [
-            'HTTP_HOST' => "127.0.0.1:{$port}",
+            'HTTP_HOST' => $this->browserHost().":{$port}",
             'WORDPRESS_DB_HOST' => 'database',
             'WORDPRESS_DB_NAME' => 'wordpress',
             'WORDPRESS_DB_USER' => 'wordpress',
@@ -269,6 +269,13 @@ YAML;
         }
 
         return $this->workingDirectory.DIRECTORY_SEPARATOR.$path;
+    }
+
+    private function browserHost(): string
+    {
+        $host = getenv('WP_PEST_BROWSER_HOST');
+
+        return is_string($host) && $host !== '' ? $host : '127.0.0.1';
     }
 
     private function setupWordPress(string $name, bool $seededFromCache = false): int

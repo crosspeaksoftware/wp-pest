@@ -200,3 +200,4 @@ test('integrates with Gravity Forms', function (): void {
 - `WP_PEST_PLUGIN_PATH`
 - `WP_PEST_WORDPRESS_VERSION`
 - `WP_PEST_MATRIX`
+- `WP_PEST_BROWSER_HOST` (host used to reach a plugin browser sandbox; defaults to `127.0.0.1`)

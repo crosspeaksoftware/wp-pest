@@ -69,6 +69,7 @@ PHP);
     $config = (new ConfigLoader)->load($this->workspace);
     $manager = new SandboxManager($config, $this->workspace);
     putenv('WP_PEST_RESOLVED_WORDPRESS_VERSION=7.0.2');
+    putenv('WP_PEST_BROWSER_HOST=docker');
 
     try {
         $path = $manager->writeCompose('default--wp-7.0.x');
@@ -77,7 +78,8 @@ PHP);
             ->and(file_get_contents($path))->toContain('wordpress:php'.PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION.'-apache')
             ->and(file_get_contents($path))->not->toContain('wordpress:7.0.2-php')
             ->and(file_get_contents($path))->toContain('user: "0:0"')
-            ->and(file_get_contents($path))->toContain('HTTP_HOST: "127.0.0.1:8091"')
+            ->and(file_get_contents($path))->toContain('HTTP_HOST: "docker:8091"')
+            ->and($manager->url('default--wp-7.0.x'))->toBe('http://docker:8091')
             ->and(file_get_contents($path))->toContain("define('WP_DEFAULT_THEME', 'twentytwentyfive');")
             ->and(file_get_contents($path))->toContain('WORDPRESS_DEBUG: "1"', 'WP_DEBUG_LOG')
             ->and(file_get_contents($path))->not->toContain('\\/proc\\/')
@@ -85,6 +87,7 @@ PHP);
             ->and(file_get_contents($path))->toContain('/plugin:/var/www/html/wp-content/plugins/plugin-under-test');
     } finally {
         putenv('WP_PEST_RESOLVED_WORDPRESS_VERSION');
+        putenv('WP_PEST_BROWSER_HOST');
     }
 });
 
