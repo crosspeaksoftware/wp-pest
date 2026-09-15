@@ -30,6 +30,25 @@ PHP);
     }
 });
 
+it('resolves relative browser paths against the active WordPress url', function (): void {
+    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+<?php
+
+return [
+    'target' => 'site',
+    'tests' => ['browser'],
+    'site' => ['url' => 'https://wordpress.example.test/site/'],
+];
+PHP);
+
+    $runtime = new WpPest((new ConfigLoader)->load($this->workspace), $this->workspace);
+
+    expect($runtime->urlFor('/wp-admin/plugins.php'))->toBe('https://wordpress.example.test/site/wp-admin/plugins.php')
+        ->and($runtime->urlFor('wp-login.php?reauth=1'))->toBe('https://wordpress.example.test/site/wp-login.php?reauth=1')
+        ->and($runtime->urlFor('https://other.example.test/path'))->toBe('https://other.example.test/path')
+        ->and($runtime->urlFor('/'))->toBe('https://wordpress.example.test/site/');
+});
+
 it('derives a plugin browser url from the active matrix without an environment override', function (): void {
     file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
 <?php

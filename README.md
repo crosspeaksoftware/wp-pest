@@ -80,13 +80,14 @@ $page_id = wp_insert_post([
     'post_type' => 'page',
 ]);
 
-return ['form_id' => $form_id, 'url' => get_permalink($page_id)];
+return ['form_id' => $form_id, 'path' => wp_make_link_relative(get_permalink($page_id))];
 PHP);
 
-actingAsAdmin()->navigate($form['url']);
+visit($form['path'])->assertSee('Test Form');
+actingAsAdmin()->navigate('/wp-admin/plugins.php')->assertSee('Plugins');
 ```
 
-`wpEval()` runs the provided PHP body in the active plugin sandbox with `$wpdb` available and returns its JSON-compatible result. It is intended for browser-test setup and inspection; use `wp_pest()->wpCli()` when the full WP-CLI output or a non-PHP CLI command is needed. `actingAsAdmin()` is limited to plugin browser sandboxes, logs in with the seeded `admin` / `password` account, and returns the browser page for chaining. It requires the optional Pest Browser plugin.
+`wpEval()` runs the provided PHP body in the active plugin sandbox with `$wpdb` available and returns its JSON-compatible result. The WordPress site runs in a separate Docker/PHP process, unlike a Laravel app booted inside Pest's process, so WordPress objects and services cannot be used directly in the test process. `wpEval()` is the RPC boundary for setup and inspection; keep returned values JSON-compatible and use `wp_pest()->wpCli()` when full WP-CLI output or a non-PHP CLI command is needed. `actingAsAdmin()` is limited to plugin browser sandboxes, logs in with the seeded `admin` / `password` account, and returns a relative-navigation-aware browser page for chaining. These helpers require the optional Pest Browser plugin when used.
 
 For plugin Code tests, the first run creates a real WordPress fixture under `.wp-pest/fixtures`, backed by the WordPress SQLite integration so no external database service is required. The fixture installs Twenty Twenty-Five from WordPress.org as its default theme, WordPress is installed, and the plugin under test is loaded before the Code suite runs.
 

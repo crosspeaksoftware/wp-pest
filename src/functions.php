@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CrossPeak\WpPest;
 
+use CrossPeak\WpPest\Browser\WpPage;
 use JsonException;
 use LogicException;
 use Pest\Browser\Configuration;
@@ -35,11 +36,11 @@ function wpEval(string $code): mixed
 /**
  * Log in to the active browser sandbox as its seeded administrator.
  *
- * @return mixed The Pest Browser page, allowing further chained interactions.
+ * @return WpPage The Pest Browser page, allowing further chained interactions.
  *
  * @throws LogicException When Pest Browser is unavailable or no site URL is configured.
  */
-function actingAsAdmin(): mixed
+function actingAsAdmin(): WpPage
 {
     if (! class_exists(Configuration::class)) {
         throw new LogicException('actingAsAdmin() requires pestphp/pest-plugin-browser.');
@@ -59,13 +60,16 @@ function actingAsAdmin(): mixed
 
     $visit = 'visit';
 
-    $page = $visit(rtrim($url, '/').'/wp-login.php');
+    $page = new WpPage(
+        $visit($runtime->urlFor('/wp-login.php')),
+        static fn (string $path): string => wp_pest()->urlFor($path),
+    );
 
-    call_user_func_array([$page, 'fill'], ['#user_login', 'admin']);
-    call_user_func_array([$page, 'fill'], ['#user_pass', 'password']);
-    call_user_func_array([$page, 'click'], ['#wp-submit']);
-    call_user_func_array([$page, 'assertPathBeginsWith'], ['/wp-admin']);
-    call_user_func_array([$page, 'assertSee'], ['Dashboard']);
+    $page->fill('#user_login', 'admin')
+        ->fill('#user_pass', 'password')
+        ->click('#wp-submit')
+        ->assertPathBeginsWith('/wp-admin')
+        ->assertSee('Dashboard');
 
     return $page;
 }

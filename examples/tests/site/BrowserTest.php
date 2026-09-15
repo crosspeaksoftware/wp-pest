@@ -1,7 +1,7 @@
 <?php
 
 it('loads the home page', function () {
-    visit(wp_pest()->url())
+    visit('/')
         ->assertSourceHas('<body')
         ->assertNoJavaScriptErrors();
 });

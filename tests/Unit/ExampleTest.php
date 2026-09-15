@@ -30,6 +30,7 @@ it('uses WordPress-friendly browser assertions in generated tests', function ():
             ->not->toContain('assertNoSmoke')
             ->not->toContain('assertSeeAnythingIn')
             ->not->toContain("assertPresent('body')")
+            ->toContain("visit('/')")
             ->toContain("assertSourceHas('<body')")
             ->toContain('assertNoJavaScriptErrors');
     }

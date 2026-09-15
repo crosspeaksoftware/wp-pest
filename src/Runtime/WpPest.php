@@ -101,6 +101,23 @@ final class WpPest
         return $this->config->siteUrl();
     }
 
+    /**
+     * Resolve a WordPress-relative path against the active site's URL.
+     */
+    public function urlFor(string $path = '/'): string
+    {
+        if (preg_match('~^https?://~i', $path) === 1) {
+            return $path;
+        }
+
+        $url = $this->url();
+        if ($url === null || $url === '') {
+            throw new RuntimeException('A WordPress browser URL is required to resolve a relative path.');
+        }
+
+        return rtrim($url, '/').'/'.ltrim($path, '/');
+    }
+
     private function startManagedBrowserSandbox(string $name): string
     {
         if ($this->managedBrowserUrl !== null) {
