@@ -16,7 +16,7 @@ use Closure;
  * @method self assertPathBeginsWith(string $path)
  * @method self assertSee(string $text)
  * @method self assertSourceHas(string $source)
- * @method self click(string $selector)
+ * @method self click(string $selector, array<string, mixed> $options = [])
  * @method self fill(string $selector, string $value)
  */
 final class WpPage
@@ -43,20 +43,18 @@ final class WpPage
     }
 
     /**
-     * Click once without Pest Browser's assertion retry loop.
+     * Click an element, using Pest Browser's default behavior unless options
+     * are explicitly provided.
      *
-     * A click can submit a form and navigate away. Retrying that action while
-     * the navigation is in progress can repeatedly submit it (and, with Pest
-     * Browser 5, wait until the full browser timeout even after the new page
-     * has loaded).
+     * @param array<string, mixed> $options
      */
-    public function click(string $selector): self
+    public function click(string $selector, array $options = []): self
     {
         if (method_exists($this->page, 'page')) {
             $page = $this->page->page();
 
             if (is_object($page) && method_exists($page, 'locator')) {
-                $page->locator($selector)->click(['noWaitAfter' => true]);
+                $page->locator($selector)->click($options);
 
                 return $this;
             }
@@ -64,6 +62,10 @@ final class WpPage
 
         // Keep support for simple wrappers and test doubles that don't expose
         // Pest Browser's underlying Playwright page.
+        if ($options !== []) {
+            throw new \InvalidArgumentException('Click options require access to Pest Browser\'s underlying Playwright page.');
+        }
+
         $this->page->click($selector);
 
         return $this;
