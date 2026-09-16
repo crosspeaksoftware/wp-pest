@@ -136,6 +136,45 @@ PHP);
         ->and($combination->pluginVersions())->toBe(['sample-plugin' => '2.0.0']);
 });
 
+it('expands configured PHP versions and includes them in matrix names', function (): void {
+    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+<?php
+
+return [
+    'target' => 'plugin',
+    'matrix' => [
+        'wordpress' => ['6.9'],
+        'php' => ['8.4', '8.5'],
+        'profiles' => ['default' => ['tests' => ['browser']]],
+    ],
+];
+PHP);
+
+    $combinations = (new ConfigLoader)->load($this->workspace)->matrixCombinations();
+
+    expect($combinations)->toHaveCount(2)
+        ->and($combinations[0]->name())->toBe('default--wp-6.9--php-8.4')
+        ->and($combinations[0]->phpVersion())->toBe('8.4')
+        ->and($combinations[1]->name())->toBe('default--wp-6.9--php-8.5')
+        ->and($combinations[1]->all()['php'])->toBe('8.5');
+});
+
+it('rejects invalid PHP matrix versions', function (): void {
+    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+<?php
+
+return [
+    'target' => 'plugin',
+    'matrix' => [
+        'php' => ['8.5.1'],
+        'profiles' => ['default' => ['tests' => ['browser']]],
+    ],
+];
+PHP);
+
+    (new ConfigLoader)->load($this->workspace);
+})->throws(ValidationException::class, 'matrix.php must be a non-empty list');
+
 it('rejects exclusions that reference unknown dimensions', function (): void {
     file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
 <?php

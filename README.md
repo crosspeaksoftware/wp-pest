@@ -111,6 +111,7 @@ return [
     ],
     'matrix' => [
         'wordpress' => ['^6.9', '^7.0'],
+        'php' => ['8.4', '8.5'],
         'plugins' => [
             // WordPress.org releases are installed through WPackagist.
             'query-monitor' => ['3.19.0', '3.20.0'],
@@ -160,11 +161,11 @@ For plugin targets, `plugin.path` defaults to the current directory. You may set
 Plugin dependencies are installed and loaded before the plugin under test in both Code fixtures and browser sandboxes. Use a WordPress.org plugin slug, a local directory path, a ZIP URL, or an explicit array with `slug`, `version`, and `url` keys. Explicit ZIP definitions are recommended when the filename does not contain a reliable plugin slug and version.
 Only configure ZIP URLs that you trust: the downloaded plugin code is loaded and executed during the test bootstrap.
 
-Every WordPress value, plugin-axis value, and profile is combined as a true Cartesian product. The example starts with 2 × 2 × 2 × 2 = 16 candidates and then applies the partial-match exclusion rules. `max_combinations` is checked after exclusions. Global `plugins.dependencies` are inherited by every profile; set `inherit_plugins` to `false`, add profile-only `plugins`, or remove inherited plugins with `exclude_plugins` when a compatibility suite needs a different environment.
+Every WordPress value, PHP value, plugin-axis value, and profile is combined as a true Cartesian product. The example starts with 2 × 2 × 2 × 2 × 2 = 32 candidates and then applies the partial-match exclusion rules. `max_combinations` is checked after exclusions. Global `plugins.dependencies` are inherited by every profile; set `inherit_plugins` to `false`, add profile-only `plugins`, or remove inherited plugins with `exclude_plugins` when a compatibility suite needs a different environment.
 
-PHP is deliberately controlled by the PHP process running Pest, rather than being another configuration axis. Configure PHP versions in the job matrix of GitHub Actions or your CI system; within each PHP job, `wp-pest` expands every configured WordPress/plugin/profile combination.
+The PHP process running Pest remains controlled by your CI job. Browser sandboxes may additionally define `matrix.php` as a list of PHP major.minor versions; each value becomes a matrix axis and selects the matching `wordpress:phpX.Y-apache` and `wordpress:cli-phpX.Y` images. If `matrix.php` is omitted, the current PHP minor is used. Code tests still execute in the PHP process running Pest.
 
-Browser sandboxes use the official WordPress image for the current PHP minor and then install the exact Composer-resolved WordPress matrix version into its shared volume. This avoids relying on Docker tags for every historical WordPress/PHP pairing.
+Browser sandboxes use the official WordPress image for the selected PHP minor and then install the exact Composer-resolved WordPress matrix version into its shared volume. This avoids relying on Docker tags for every historical WordPress/PHP pairing.
 
 ## CLI
 

@@ -19,6 +19,7 @@ final readonly class MatrixCombination
         private string $name,
         private string $profile,
         private string $wordpress,
+        private string $phpVersion,
         private array $tests,
         private array $plugins,
         private array $groups,
@@ -41,6 +42,11 @@ final readonly class MatrixCombination
     public function wordpress(): string
     {
         return $this->wordpress;
+    }
+
+    public function phpVersion(): string
+    {
+        return $this->phpVersion;
     }
 
     /** @return list<string> */
@@ -90,6 +96,7 @@ final readonly class MatrixCombination
             'name' => $this->name,
             'profile' => $this->profile,
             'wordpress' => $this->wordpress,
+            'php' => $this->phpVersion,
             'tests' => $this->tests,
             'plugins' => $this->pluginVersions,
             'groups' => $this->groups,

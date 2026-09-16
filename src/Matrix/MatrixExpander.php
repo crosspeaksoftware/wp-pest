@@ -15,6 +15,8 @@ final class MatrixExpander
     {
         $matrix = $config->matrixDefinition();
         $wordpressVersions = $matrix['wordpress'] ?? [$config->baseWordpressVersion()];
+        $phpVersions = $matrix['php'] ?? [PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION];
+        $hasPhpAxis = array_key_exists('php', $matrix);
         $pluginDefinitions = $matrix['plugins'] ?? [];
         if (! is_array($pluginDefinitions)) {
             throw new ValidationException(['matrix.plugins must be an array of plugin axes.']);
@@ -30,7 +32,7 @@ final class MatrixExpander
         $exclusions = $matrix['exclude'] ?? [];
         $max = $matrix['max_combinations'] ?? 100;
 
-        $this->validate($wordpressVersions, $axes, $profiles, $exclusions, $max);
+        $this->validate($wordpressVersions, $phpVersions, $axes, $profiles, $exclusions, $max);
 
         $axisSelections = $this->axisSelections($axes);
         $combinations = [];
@@ -39,63 +41,67 @@ final class MatrixExpander
 
         foreach ($profiles as $profileName => $profile) {
             foreach ($wordpressVersions as $wordpress) {
-                foreach ($axisSelections as $selection) {
-                    $versions = [];
-                    foreach ($selection as $slug => $dependency) {
-                        $versions[$slug] = $dependency->version();
-                    }
+                foreach ($phpVersions as $phpVersion) {
+                    foreach ($axisSelections as $selection) {
+                        $versions = [];
+                        foreach ($selection as $slug => $dependency) {
+                            $versions[$slug] = $dependency->version();
+                        }
 
-                    if ($this->excluded((string) $profileName, (string) $wordpress, $versions, $exclusions)) {
-                        continue;
-                    }
+                        if ($this->excluded((string) $profileName, (string) $wordpress, (string) $phpVersion, $versions, $exclusions)) {
+                            continue;
+                        }
 
-                    $plugins = $this->effectivePlugins($config, $selection, $profile);
-                    $effectiveVersions = [];
-                    foreach ($plugins as $plugin) {
-                        $effectiveVersions[$plugin->slug()] = $plugin->version();
-                    }
-                    $tests = array_values($profile['tests']);
-                    $groups = array_values($profile['groups'] ?? []);
-                    $fingerprint = json_encode([
-                        $wordpress,
-                        $tests,
-                        array_map(static fn (PluginDependency $plugin): string => $plugin->packageName().'@'.$plugin->version(), $plugins),
-                        $groups,
-                        $profile['database'] ?? $browser['database'] ?? 'mariadb:11',
-                        $profile['env'] ?? $browser['env'] ?? [],
-                    ], JSON_THROW_ON_ERROR);
+                        $plugins = $this->effectivePlugins($config, $selection, $profile);
+                        $effectiveVersions = [];
+                        foreach ($plugins as $plugin) {
+                            $effectiveVersions[$plugin->slug()] = $plugin->version();
+                        }
+                        $tests = array_values($profile['tests']);
+                        $groups = array_values($profile['groups'] ?? []);
+                        $fingerprint = json_encode([
+                            $wordpress,
+                            $phpVersion,
+                            $tests,
+                            array_map(static fn (PluginDependency $plugin): string => $plugin->packageName().'@'.$plugin->version(), $plugins),
+                            $groups,
+                            $profile['database'] ?? $browser['database'] ?? 'mariadb:11',
+                            $profile['env'] ?? $browser['env'] ?? [],
+                        ], JSON_THROW_ON_ERROR);
 
-                    if (isset($fingerprints[$fingerprint])) {
-                        continue;
-                    }
-                    $fingerprints[$fingerprint] = true;
-                    $expandedCount++;
-                    if ($expandedCount > $max) {
-                        throw new ValidationException(["Matrix expands to more than {$max} combinations after exclusions. Add exclusions or raise max_combinations."]);
-                    }
+                        if (isset($fingerprints[$fingerprint])) {
+                            continue;
+                        }
+                        $fingerprints[$fingerprint] = true;
+                        $expandedCount++;
+                        if ($expandedCount > $max) {
+                            throw new ValidationException(["Matrix expands to more than {$max} combinations after exclusions. Add exclusions or raise max_combinations."]);
+                        }
 
-                    $nameVersions = $versions;
-                    foreach ($nameVersions as $slug => $version) {
-                        $nameVersions[$slug] = $effectiveVersions[$slug] ?? $version;
-                    }
+                        $nameVersions = $versions;
+                        foreach ($nameVersions as $slug => $version) {
+                            $nameVersions[$slug] = $effectiveVersions[$slug] ?? $version;
+                        }
 
-                    $name = $this->name((string) $profileName, (string) $wordpress, $nameVersions);
-                    if (isset($combinations[$name])) {
-                        $name .= '--'.substr(sha1($fingerprint), 0, 8);
-                    }
+                        $name = $this->name((string) $profileName, (string) $wordpress, (string) $phpVersion, $nameVersions, $hasPhpAxis);
+                        if (isset($combinations[$name])) {
+                            $name .= '--'.substr(sha1($fingerprint), 0, 8);
+                        }
 
-                    $combinations[$name] = new MatrixCombination(
-                        $name,
-                        (string) $profileName,
-                        (string) $wordpress,
-                        $tests,
-                        $plugins,
-                        $groups,
-                        (string) ($profile['database'] ?? $browser['database'] ?? 'mariadb:11'),
-                        array_map('strval', $profile['env'] ?? $browser['env'] ?? []),
-                        (int) ($profile['port'] ?? $browser['port'] ?? 0),
-                        $effectiveVersions,
-                    );
+                        $combinations[$name] = new MatrixCombination(
+                            $name,
+                            (string) $profileName,
+                            (string) $wordpress,
+                            (string) $phpVersion,
+                            $tests,
+                            $plugins,
+                            $groups,
+                            (string) ($profile['database'] ?? $browser['database'] ?? 'mariadb:11'),
+                            array_map('strval', $profile['env'] ?? $browser['env'] ?? []),
+                            (int) ($profile['port'] ?? $browser['port'] ?? 0),
+                            $effectiveVersions,
+                        );
+                    }
                 }
             }
         }
@@ -192,13 +198,16 @@ final class MatrixExpander
      * @param  array<string, string>  $versions
      * @param  list<array<string, mixed>>  $exclusions
      */
-    private function excluded(string $profile, string $wordpress, array $versions, array $exclusions): bool
+    private function excluded(string $profile, string $wordpress, string $phpVersion, array $versions, array $exclusions): bool
     {
         foreach ($exclusions as $rule) {
             if (isset($rule['profile']) && $rule['profile'] !== $profile) {
                 continue;
             }
             if (isset($rule['wordpress']) && $rule['wordpress'] !== $wordpress) {
+                continue;
+            }
+            if (isset($rule['php']) && $rule['php'] !== $phpVersion) {
                 continue;
             }
 
@@ -219,9 +228,12 @@ final class MatrixExpander
     }
 
     /** @param array<string, string> $versions */
-    private function name(string $profile, string $wordpress, array $versions): string
+    private function name(string $profile, string $wordpress, string $phpVersion, array $versions, bool $includePhp): string
     {
         $parts = [$profile, 'wp-'.$wordpress];
+        if ($includePhp) {
+            $parts[] = 'php-'.$phpVersion;
+        }
         foreach ($versions as $slug => $version) {
             $parts[] = $slug.'-'.$version;
         }
@@ -238,11 +250,14 @@ final class MatrixExpander
     /**
      * @param  array<string, list<PluginDependency>>  $axes
      */
-    private function validate(mixed $wordpressVersions, array $axes, mixed $profiles, mixed $exclusions, mixed $max): void
+    private function validate(mixed $wordpressVersions, mixed $phpVersions, array $axes, mixed $profiles, mixed $exclusions, mixed $max): void
     {
         $errors = [];
         if (! is_array($wordpressVersions) || ! array_is_list($wordpressVersions) || $wordpressVersions === [] || array_filter($wordpressVersions, 'is_string') !== $wordpressVersions) {
             $errors[] = 'matrix.wordpress must be a non-empty list of version constraints.';
+        }
+        if (! is_array($phpVersions) || ! array_is_list($phpVersions) || $phpVersions === [] || array_filter($phpVersions, 'is_string') !== $phpVersions || array_filter($phpVersions, static fn (string $version): bool => preg_match('/^\d+\.\d+$/', $version) === 1) !== $phpVersions) {
+            $errors[] = 'matrix.php must be a non-empty list of PHP major.minor versions.';
         }
         foreach ($axes as $slug => $variants) {
             if ($slug === '' || $variants === []) {
@@ -302,6 +317,9 @@ final class MatrixExpander
                 }
                 if (isset($rule['wordpress']) && (! is_array($wordpressVersions) || ! in_array($rule['wordpress'], $wordpressVersions, true))) {
                     $errors[] = "matrix.exclude[{$index}] references an unknown WordPress version.";
+                }
+                if (isset($rule['php']) && (! is_array($phpVersions) || ! in_array($rule['php'], $phpVersions, true))) {
+                    $errors[] = "matrix.exclude[{$index}] references an unknown PHP version.";
                 }
                 if (isset($rule['plugins']) && ! is_array($rule['plugins'])) {
                     $errors[] = "matrix.exclude[{$index}].plugins must be an array.";

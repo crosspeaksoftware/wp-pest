@@ -218,7 +218,7 @@ final class SandboxManager
             $environment .= "      {$key}: ".json_encode($value, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)."\n";
         }
 
-        $php = PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION;
+        $php = $entry->phpVersion();
         $wordpressImage = "wordpress:php{$php}-apache";
 
         return <<<YAML
