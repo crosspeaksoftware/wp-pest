@@ -46,7 +46,7 @@ final class WpPage
      * Click an element, using Pest Browser's default behavior unless options
      * are explicitly provided.
      *
-     * @param array<string, mixed> $options
+     * @param  array<string, mixed>  $options
      */
     public function click(string $selector, array $options = []): self
     {
