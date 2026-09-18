@@ -15,6 +15,8 @@ final class SandboxManager
     /** @var list<string>|null */
     private ?array $composeCommand = null;
 
+    private ?LocalSandboxManager $localManager = null;
+
     public function __construct(
         private readonly Config $config,
         private readonly string $workingDirectory,
@@ -45,6 +47,10 @@ final class SandboxManager
 
     public function writeCompose(string $name): string
     {
+        if ($this->usesLocalDriver($name)) {
+            return $this->local()->writeCompose($name);
+        }
+
         $entry = $this->entry($name);
         $directory = $this->sandboxDirectory($name);
 
@@ -60,6 +66,10 @@ final class SandboxManager
 
     public function start(string $name, bool $fresh = false): int
     {
+        if ($this->usesLocalDriver($name)) {
+            return $this->local()->start($name, $fresh);
+        }
+
         $this->writeCompose($name);
         $seededFromCache = false;
 
@@ -83,11 +93,19 @@ final class SandboxManager
 
     public function stop(string $name): int
     {
+        if ($this->usesLocalDriver($name)) {
+            return $this->local()->stop($name);
+        }
+
         return $this->compose($name, ['stop']);
     }
 
     public function reset(string $name): int
     {
+        if ($this->usesLocalDriver($name)) {
+            return $this->local()->reset($name);
+        }
+
         $down = $this->compose($name, ['down', '--volumes', '--remove-orphans']);
 
         return $down === 0 ? $this->start($name) : $down;
@@ -95,11 +113,24 @@ final class SandboxManager
 
     public function destroy(string $name): int
     {
+        if ($this->usesLocalDriver($name)) {
+            return $this->local()->destroy($name);
+        }
+
         return $this->compose($name, ['down', '--volumes', '--remove-orphans']);
+    }
+
+    public function driver(string $name): string
+    {
+        return $this->usesLocalDriver($name) ? 'local' : 'docker';
     }
 
     public function url(string $name): string
     {
+        if ($this->usesLocalDriver($name)) {
+            return $this->local()->url($name);
+        }
+
         $entry = $this->entry($name);
         $port = $entry->port();
 
@@ -117,6 +148,10 @@ final class SandboxManager
      */
     public function wpCli(string $name, array $arguments): string
     {
+        if ($this->usesLocalDriver($name)) {
+            return $this->local()->wpCli($name, $arguments);
+        }
+
         $command = array_merge(
             $this->composeCommand($name),
             ['run', '--rm', '--no-deps', 'wpcli', 'php', '-d', 'memory_limit=512M', '/usr/local/bin/wp'],
@@ -372,5 +407,35 @@ PHP;
             .DIRECTORY_SEPARATOR.$slug;
 
         return is_dir($path) ? $path : null;
+    }
+
+    private function usesLocalDriver(string $name): bool
+    {
+        $driver = getenv('WP_PEST_SANDBOX');
+        if (! is_string($driver) || $driver === '') {
+            $driver = (string) $this->config->get('sandbox.driver', 'auto');
+        }
+
+        if (! in_array($driver, ['auto', 'docker', 'local'], true)) {
+            throw new ValidationException(["Unknown sandbox driver: {$driver}. Use \"auto\", \"docker\" or \"local\"."]);
+        }
+
+        if ($driver !== 'auto') {
+            return $driver === 'local';
+        }
+
+        $entry = $this->entry($name);
+        $phpAxis = (bool) $this->config->get('sandbox.auto_php_explicit', false);
+        $databaseExplicit = (bool) $this->config->get('sandbox.auto_database_explicit', false);
+        $phpVersions = $this->config->matrixDefinition()['php'] ?? [];
+        $multiplePhpVersions = is_array($phpVersions) && count($phpVersions) > 1;
+        $databaseRequiresDocker = $databaseExplicit && strtolower($entry->database()) !== 'sqlite';
+
+        return ! $multiplePhpVersions && ! $databaseRequiresDocker && (! $phpAxis || $entry->phpVersion() === PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION);
+    }
+
+    private function local(): LocalSandboxManager
+    {
+        return $this->localManager ??= new LocalSandboxManager($this->config, $this->workingDirectory, $this->process);
     }
 }

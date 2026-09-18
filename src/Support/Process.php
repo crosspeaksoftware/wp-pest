@@ -59,8 +59,38 @@ final class Process implements ProcessRunner
             throw new RuntimeException('Unable to start process.');
         }
 
-        $output = stream_get_contents($pipes[1]);
-        $error = stream_get_contents($pipes[2]);
+        stream_set_blocking($pipes[1], false);
+        stream_set_blocking($pipes[2], false);
+        $output = '';
+        $error = '';
+        $open = [$pipes[1], $pipes[2]];
+
+        while ($open !== []) {
+            $read = $open;
+            $write = null;
+            $except = null;
+            if (stream_select($read, $write, $except, null) === false) {
+                break;
+            }
+
+            foreach ($read as $pipe) {
+                $contents = stream_get_contents($pipe);
+                if ($pipe === $pipes[1]) {
+                    $output .= (string) $contents;
+                } else {
+                    $error .= (string) $contents;
+                }
+
+                if (feof($pipe)) {
+                    $key = array_search($pipe, $open, true);
+                    if ($key !== false) {
+                        unset($open[$key]);
+                    }
+                }
+            }
+            $open = array_values($open);
+        }
+
         fclose($pipes[1]);
         fclose($pipes[2]);
         $exitCode = proc_close($process);

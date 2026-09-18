@@ -174,6 +174,16 @@ final class WpPest
         return is_string($name) && $name !== '' ? $name : $this->config->activeMatrix()?->name();
     }
 
+    public function sandboxDriver(): string
+    {
+        $name = $this->matrixName();
+        if ($name === null) {
+            throw new RuntimeException('No active matrix sandbox is available.');
+        }
+
+        return (new SandboxManager($this->config, $this->workingDirectory))->driver($name);
+    }
+
     /**
      * Run WP-CLI inside the active plugin browser sandbox.
      *

@@ -24,6 +24,11 @@ final class PluginFixture
             ? $name
             : ($this->config->activeMatrix()?->name() ?? 'default');
 
+        return $this->pathFor($name);
+    }
+
+    public function pathFor(string $name): string
+    {
         return $this->workingDirectory.DIRECTORY_SEPARATOR.'.wp-pest'.DIRECTORY_SEPARATOR.'fixtures'.DIRECTORY_SEPARATOR.$name;
     }
 
@@ -145,7 +150,7 @@ final class PluginFixture
         }
 
         $config = $wordpressPath.DIRECTORY_SEPARATOR.'wp-config.php';
-        if (is_file($config)) {
+        if (is_file($config) && filetype($config) === 'file') {
             $contents = (string) file_get_contents($config);
             if (str_contains($contents, "define('WP_DEFAULT_THEME'")) {
                 $contents = (string) preg_replace(
@@ -164,6 +169,17 @@ final class PluginFixture
             }
 
             return;
+        }
+
+        if (file_exists($config) || is_link($config)) {
+            // A stale fixture may contain a mounted device at this path. The
+            // local sandbox copies fixtures and creates its own config, so do
+            // not attempt to mutate an unusable cached fixture in place.
+            if (filetype($config) !== 'file') {
+                return;
+            }
+
+            unlink($config);
         }
 
         $databasePath = $wordpressPath.DIRECTORY_SEPARATOR.'.wp-pest';

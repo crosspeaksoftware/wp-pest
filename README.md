@@ -51,6 +51,15 @@ vendor/bin/pest --testsuite=Browser
 
 For plugin browser tests, `vendor/bin/pest --testsuite=Browser` automatically starts and stops the first generated matrix sandbox. Test runs remove the selected sandbox's WordPress and database volumes before setup so every run starts from a clean installation. The exact WordPress core and dependency plugin packages remain cached in the matrix fixture and are copied into the fresh runtime volume, avoiding repeat downloads after the first run. Use `vendor/bin/wp-pest run --tests=browser --matrix=<name>` to select a particular combination, or `--matrix=all` to run every combination. Manual `sandbox:start` remains non-destructive; use `sandbox:reset` when you explicitly want to recreate a manually managed sandbox.
 
+Plugin browser tests use an automatic sandbox driver by default. A normal current-PHP/SQLite-compatible run uses the local sandbox; explicit MariaDB requirements, multiple PHP versions, or an explicit Docker selection use Docker. You can override the selection:
+
+```bash
+WP_PEST_SANDBOX=local vendor/bin/wp-pest run --tests=browser --matrix=<name>
+WP_PEST_SANDBOX=docker vendor/bin/wp-pest run --tests=browser --matrix=<name>
+```
+
+The local driver copies the cached WordPress fixture, uses SQLite, runs PHP's built-in server, and executes WP-CLI locally. It requires PHP CLI, the SQLite extension, WP-CLI, and the browser test dependencies. Set `sandbox.driver` to `local`, `docker`, or `auto` in `wp-pest.php`; `WP_PEST_SANDBOX` takes precedence over that setting.
+
 The generated `tests/Pest.php` bootstraps WordPress before Code test files are discovered, while Browser-only runs skip the local WordPress fixture.
 It also increases Pest Browser's default wait timeout from five seconds to one minute.
 The generated browser tests assert that the page source includes a document body and that there are no JavaScript errors.
@@ -108,6 +117,7 @@ return [
     ],
     'sandbox' => [
         'path' => '.wp-pest/sandboxes',
+        'driver' => 'auto',
     ],
     'matrix' => [
         'wordpress' => ['^6.9', '^7.0'],

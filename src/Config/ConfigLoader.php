@@ -31,6 +31,9 @@ final class ConfigLoader
             ],
             'sandbox' => [
                 'path' => '.wp-pest/sandboxes',
+                'driver' => 'auto',
+                'auto_database_explicit' => false,
+                'auto_php_explicit' => false,
             ],
             'matrix' => [
                 'wordpress' => ['^7.0'],
@@ -68,6 +71,17 @@ final class ConfigLoader
 
         $config = $this->merge(self::defaults(), $userConfig);
         $userMatrix = $userConfig['matrix'] ?? null;
+        if (is_array($userMatrix)) {
+            $config['sandbox']['auto_php_explicit'] = array_key_exists('php', $userMatrix);
+            $config['sandbox']['auto_database_explicit'] = array_key_exists('browser', $userMatrix)
+                && is_array($userMatrix['browser'])
+                && array_key_exists('database', $userMatrix['browser']);
+            foreach ($userMatrix['profiles'] ?? [] as $profile) {
+                if (is_array($profile) && array_key_exists('database', $profile)) {
+                    $config['sandbox']['auto_database_explicit'] = true;
+                }
+            }
+        }
         if (! is_array($userMatrix) || ! array_key_exists('profiles', $userMatrix)) {
             $config['matrix']['profiles']['default']['tests'] = $config['tests'];
         }

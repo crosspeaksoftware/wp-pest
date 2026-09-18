@@ -61,14 +61,17 @@ function actingAsAdmin(): WpPage
     $visit = 'visit';
 
     $page = new WpPage(
-        $visit($runtime->urlFor('/wp-login.php')),
+        $visit($runtime->urlFor('/wp-admin/')),
         static fn (string $path): string => wp_pest()->urlFor($path),
     );
 
-    $page->fill('#user_login', 'admin')
-        ->fill('#user_pass', 'password')
-        ->click('#wp-submit')
-        ->assertPathBeginsWith('/wp-admin')
+    if (str_contains($page->url(), '/wp-login.php')) {
+        $page->fill('#user_login', 'admin')
+            ->fill('#user_pass', 'password')
+            ->click('#wp-submit');
+    }
+
+    $page->assertPathBeginsWith('/wp-admin')
         ->assertSee('Dashboard');
 
     return $page;
