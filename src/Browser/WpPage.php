@@ -42,6 +42,12 @@ final class WpPage
         return $this;
     }
 
+    /** Return the current page URL. */
+    public function url(): string
+    {
+        return $this->page->url();
+    }
+
     /**
      * Click an element, using Pest Browser's default behavior unless options
      * are explicitly provided.
