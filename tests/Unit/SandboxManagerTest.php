@@ -77,7 +77,7 @@ PHP);
         expect($path)->toBeFile()
             ->and(file_get_contents($path))->toContain('wordpress:php'.PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION.'-apache')
             ->and(file_get_contents($path))->not->toContain('wordpress:7.0.2-php')
-            ->and(file_get_contents($path))->toContain('user: "0:0"')
+            ->and(file_get_contents($path))->toContain('user: "33:33"')
             ->and(file_get_contents($path))->toContain('HTTP_HOST: "docker:8091"')
             ->and($manager->url('default--wp-7.0.x'))->toBe('http://docker:8091')
             ->and(file_get_contents($path))->toContain("define('WP_DEFAULT_THEME', 'twentytwentyfive');")
@@ -88,6 +88,34 @@ PHP);
     } finally {
         putenv('WP_PEST_RESOLVED_WORDPRESS_VERSION');
         putenv('WP_PEST_BROWSER_HOST');
+    }
+});
+
+it('allows the wp-cli container user to be overridden', function (): void {
+    mkdir($this->workspace.'/plugin');
+    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+<?php
+
+return [
+    'target' => 'plugin',
+    'tests' => ['browser'],
+    'plugin' => ['path' => 'plugin'],
+    'matrix' => [
+        'wordpress' => ['7.0.*'],
+        'profiles' => ['default' => ['tests' => ['browser']]],
+    ],
+];
+PHP);
+
+    putenv('WP_PEST_WPCLI_USER=1000:1000');
+
+    try {
+        $config = (new ConfigLoader)->load($this->workspace);
+        $path = (new SandboxManager($config, $this->workspace))->writeCompose('default--wp-7.0.x');
+
+        expect(file_get_contents($path))->toContain('user: "1000:1000"');
+    } finally {
+        putenv('WP_PEST_WPCLI_USER');
     }
 });
 
@@ -116,7 +144,7 @@ PHP);
 
         expect($manager->start('default--wp-6.9'))->toBe(0);
 
-        $script = $process->commands[1][array_key_last($process->commands[1])];
+        $script = $process->commands[2][array_key_last($process->commands[2])];
         expect($script)->toContain(
             "php -d memory_limit=512M /usr/local/bin/wp core download --allow-root --force --version='6.9.5'",
             'fsockopen',
@@ -150,10 +178,11 @@ PHP);
     $manager = new SandboxManager($config, $this->workspace, $process);
 
     expect($manager->start('default--wp-7.0', fresh: true))->toBe(0)
-        ->and($process->commands)->toHaveCount(3)
+        ->and($process->commands)->toHaveCount(4)
         ->and($process->commands[0])->toContain('down', '--volumes', '--remove-orphans')
         ->and($process->commands[1])->toContain('up', '-d')
-        ->and($process->commands[2])->toContain('run', '--rm', 'wpcli');
+        ->and($process->commands[2])->toContain('run', '--rm', '--no-deps', '--user', '0:0', 'wpcli')
+        ->and($process->commands[3])->toContain('run', '--rm', 'wpcli');
 });
 
 it('seeds a fresh wordpress volume from the resolved fixture cache', function (): void {
@@ -183,10 +212,10 @@ PHP);
         $manager = new SandboxManager($config, $this->workspace, $process);
 
         expect($manager->start('default--wp-7.0', fresh: true))->toBe(0)
-            ->and($process->commands)->toHaveCount(4)
-            ->and($process->commands[1])->toContain('run', '--rm', '--no-deps', 'wpcli', 'sh', '-lc')
+            ->and($process->commands)->toHaveCount(5)
+            ->and($process->commands[1])->toContain('run', '--rm', '--no-deps', '--user', '0:0', 'wpcli', 'sh', '-lc')
             ->and($process->commands[1][array_key_last($process->commands[1])])->toContain('/wp-pest-cache/wordpress/wp-admin')
-            ->and($process->commands[3][array_key_last($process->commands[3])])->not->toContain('core download')
+            ->and($process->commands[4][array_key_last($process->commands[4])])->not->toContain('core download')
             ->and(file_get_contents($this->workspace.'/.wp-pest/sandboxes/default--wp-7.0/compose.yml'))
             ->toContain($this->workspace.'/cache:/wp-pest-cache/wordpress:ro');
     } finally {
@@ -233,10 +262,10 @@ PHP);
     $manager = new SandboxManager($config, $this->workspace, $process);
 
     expect($manager->start('compat--wp-7.0.x'))->toBe(0)
-        ->and($process->commands)->toHaveCount(2)
-        ->and($process->commands[1])->toContain('run', '--rm', 'wpcli');
+        ->and($process->commands)->toHaveCount(3)
+        ->and($process->commands[2])->toContain('run', '--rm', 'wpcli');
 
-    $script = $process->commands[1][array_key_last($process->commands[1])];
+    $script = $process->commands[2][array_key_last($process->commands[2])];
     expect($script)->toContain(
         "wp plugin install 'query-monitor' --activate --force --allow-root",
         "wp plugin install 'https://example.test/premium-addon-1.2.3.zip' --activate --force --allow-root",
@@ -274,7 +303,7 @@ PHP);
             ->and(file_get_contents($this->workspace.'/.wp-pest/sandboxes/default--wp-7.0--query-monitor-3.20.0/compose.yml'))
             ->toContain($this->workspace.'/fixture/wp-content/plugins/query-monitor:/var/www/html/wp-content/plugins/query-monitor');
 
-        $script = $process->commands[1][array_key_last($process->commands[1])];
+        $script = $process->commands[2][array_key_last($process->commands[2])];
         expect($script)->toContain("wp plugin activate 'query-monitor' --allow-root")
             ->not->toContain("wp plugin install 'query-monitor'");
     } finally {

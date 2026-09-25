@@ -87,8 +87,16 @@ final class SandboxManager
         }
 
         $up = $this->compose($name, ['up', '-d']);
+        if ($up !== 0) {
+            return $up;
+        }
 
-        return $up === 0 ? $this->setupWordPress($name, $seededFromCache) : $up;
+        $permissions = $this->prepareWordpressVolume($name);
+        if ($permissions !== 0) {
+            return $permissions;
+        }
+
+        return $this->setupWordPress($name, $seededFromCache);
     }
 
     public function stop(string $name): int
@@ -255,6 +263,7 @@ final class SandboxManager
 
         $php = $entry->phpVersion();
         $wordpressImage = "wordpress:php{$php}-apache";
+        $wpcliUser = getenv('WP_PEST_WPCLI_USER') ?: '33:33';
 
         return <<<YAML
 services:
@@ -271,7 +280,7 @@ services:
 
   wpcli:
     image: wordpress:cli-php{$php}
-    user: "0:0"
+    user: "{$wpcliUser}"
     environment:
 {$environment}    volumes:
       - wordpress:/var/www/html
@@ -391,7 +400,21 @@ PHP;
             .' && find /wp-pest-cache/wordpress -maxdepth 1 -type f ! -name wp-config.php -exec cp -a {} /var/www/html/ \\;'
             .' && cp -a /wp-pest-cache/wordpress/wp-content/themes/. /var/www/html/wp-content/themes/';
 
-        return $this->compose($name, ['run', '--rm', '--no-deps', 'wpcli', 'sh', '-lc', $script]);
+        return $this->compose($name, ['run', '--rm', '--no-deps', '--user', '0:0', 'wpcli', 'sh', '-lc', $script]);
+    }
+
+    /**
+     * Ensure the non-root wp-cli user can write the shared WordPress volume.
+     */
+    private function prepareWordpressVolume(string $name): int
+    {
+        $user = getenv('WP_PEST_WPCLI_USER') ?: '33:33';
+        [$uid, $gid] = array_pad(explode(':', $user, 2), 2, $user);
+        $script = 'mkdir -p /var/www/html/wp-content/themes /var/www/html/wp-content/plugins'
+            .' && chown '.escapeshellarg($uid.':'.$gid).' /var/www/html /var/www/html/wp-content /var/www/html/wp-content/plugins'
+            .' && chown -R '.escapeshellarg($uid.':'.$gid).' /var/www/html/wp-admin /var/www/html/wp-includes /var/www/html/wp-content/themes';
+
+        return $this->compose($name, ['run', '--rm', '--no-deps', '--user', '0:0', 'wpcli', 'sh', '-lc', $script]);
     }
 
     private function fixtureDependencyPath(string $slug): ?string
