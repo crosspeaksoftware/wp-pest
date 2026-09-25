@@ -7,6 +7,16 @@ use CrossPeak\WpPest\Config\ValidationException;
 use CrossPeak\WpPest\Sandbox\SandboxManager;
 use CrossPeak\WpPest\Support\ProcessRunner;
 
+beforeEach(function (): void {
+    // These tests exercise Docker Compose command generation. Keep them
+    // independent of the host's automatic local-driver selection.
+    putenv('WP_PEST_SANDBOX=docker');
+});
+
+afterEach(function (): void {
+    putenv('WP_PEST_SANDBOX');
+});
+
 it('selects all matrix entries', function (): void {
     file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
 <?php
