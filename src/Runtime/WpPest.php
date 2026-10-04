@@ -9,16 +9,20 @@ use CrossPeak\WpPest\Config\ConfigLoader;
 use CrossPeak\WpPest\Sandbox\PluginFixture;
 use CrossPeak\WpPest\Sandbox\SandboxManager;
 use CrossPeak\WpPest\Support\SiteDetector;
+use PDO;
 use RuntimeException;
 
 final class WpPest
 {
     private static ?self $instance = null;
 
-    /** @var array<string, string|null> */
-    private array $loadedPlugins = [];
-
     private ?string $managedBrowserUrl = null;
+
+    private ?Factory $factory = null;
+
+    private bool $databaseTransactionActive = false;
+
+    private bool $sqliteTransaction = false;
 
     public function __construct(
         private readonly Config $config,
@@ -51,6 +55,28 @@ final class WpPest
     public function hasBrowserTests(): bool
     {
         return $this->config->hasBrowserTests();
+    }
+
+    public function factory(): Factory
+    {
+        return $this->factory ??= new Factory;
+    }
+
+    public function actingAsAdministrator(): int
+    {
+        if (! function_exists('wp_set_current_user') || ! function_exists('get_user_by')) {
+            throw new RuntimeException('WordPress must be bootstrapped before authenticating users.');
+        }
+
+        $administrator = get_user_by('login', 'admin');
+        $administratorId = is_object($administrator) ? (get_object_vars($administrator)['ID'] ?? null) : null;
+        $userId = is_int($administratorId)
+            ? $administratorId
+            : $this->factory()->user->create(['role' => 'administrator']);
+
+        wp_set_current_user($userId);
+
+        return $userId;
     }
 
     public function shouldBootstrapWordPress(): bool
@@ -237,10 +263,6 @@ final class WpPest
     public function hasPlugin(string $slug): bool
     {
         $slug = $this->normalizeSlug($slug);
-        if (array_key_exists($slug, $this->loadedPlugins)) {
-            return true;
-        }
-
         foreach ($this->config->dependencyPlugins() as $plugin) {
             if ($plugin->slug() === $slug) {
                 return true;
@@ -253,11 +275,6 @@ final class WpPest
     public function pluginVersion(string $slug): ?string
     {
         $slug = $this->normalizeSlug($slug);
-        $loadedVersion = $this->loadedPlugins[$slug] ?? null;
-        if ($loadedVersion !== null) {
-            return $loadedVersion;
-        }
-
         foreach ($this->config->dependencyPlugins() as $plugin) {
             if ($plugin->slug() === $slug) {
                 return $plugin->version() === '*' ? null : $plugin->version();
@@ -295,91 +312,102 @@ final class WpPest
 
         require_once $wpLoad;
 
-        if ($this->target() === 'plugin') {
-            $this->installWordPress();
-            $this->loadDependencies($path);
-            $this->loadPlugin($this->pluginPath());
-        }
+        $this->configureSqlite();
+        $this->applyWordpressOptions();
 
         return true;
     }
 
-    private function installWordPress(): void
+    public function beginDatabaseTransaction(): void
     {
-        $isBlogInstalledName = 'is_blog_installed';
-        if (! function_exists($isBlogInstalledName)) {
+        $this->applyWordpressOptions();
+
+        if (! $this->config->useDatabaseTransactions() || $this->databaseTransactionActive) {
             return;
         }
 
-        $installingName = 'wp_installing';
-        if ($this->callFunction($isBlogInstalledName)) {
-            if (function_exists($installingName)) {
-                $this->callFunction($installingName, false);
+        $pdo = $GLOBALS['@pdo'] ?? null;
+        if ($pdo instanceof PDO) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
             }
 
+            $pdo->beginTransaction();
+            $this->sqliteTransaction = true;
+            $this->databaseTransactionActive = true;
+
             return;
         }
 
-        $absolutePath = defined('ABSPATH') ? constant('ABSPATH') : null;
-        if (! is_string($absolutePath)) {
-            return;
-        }
-
-        require_once $absolutePath.'wp-admin/includes/upgrade.php';
-
-        $installName = 'wp_install';
-        $addFilterName = 'add_filter';
-        $removeFilterName = 'remove_filter';
-        $skipMail = static fn (): bool => true;
-
-        if (function_exists($addFilterName)) {
-            $this->callFunction($addFilterName, 'pre_wp_mail', $skipMail);
-        }
-
-        if (function_exists($installName)) {
-            $this->callFunction($installName, 'WP Pest', 'admin', 'admin@example.test', true, '', 'password');
-        }
-
-        if (function_exists($removeFilterName)) {
-            $this->callFunction($removeFilterName, 'pre_wp_mail', $skipMail);
-        }
-
-        if (function_exists($installingName)) {
-            $this->callFunction($installingName, false);
+        $database = $GLOBALS['wpdb'] ?? null;
+        if (is_object($database) && method_exists($database, 'query')) {
+            $database->query('START TRANSACTION');
+            $this->databaseTransactionActive = true;
         }
     }
 
-    private function loadDependencies(string $wordpressPath): void
+    public function rollbackDatabaseTransaction(): void
     {
-        foreach ($this->config->dependencyPlugins() as $dependency) {
-            $path = $dependency->isLocalPath()
-                ? $this->absolutePath($dependency->source())
-                : $wordpressPath.DIRECTORY_SEPARATOR.'wp-content'.DIRECTORY_SEPARATOR.'plugins'.DIRECTORY_SEPARATOR.$dependency->slug();
-
-            $this->loadPlugin($path);
-        }
-    }
-
-    private function loadPlugin(?string $path): void
-    {
-        if ($path === null || ! is_dir($path)) {
+        if (! $this->databaseTransactionActive) {
             return;
         }
 
-        foreach (glob($path.DIRECTORY_SEPARATOR.'*.php') ?: [] as $file) {
-            $getFileDataName = 'get_file_data';
-            if (! function_exists($getFileDataName)) {
-                return;
+        $pdo = $GLOBALS['@pdo'] ?? null;
+        if ($this->sqliteTransaction && $pdo instanceof PDO && $pdo->inTransaction()) {
+            $pdo->rollBack();
+        } else {
+            $database = $GLOBALS['wpdb'] ?? null;
+            if (is_object($database) && method_exists($database, 'query')) {
+                $database->query('ROLLBACK');
+            }
+        }
+
+        $this->databaseTransactionActive = false;
+        $this->sqliteTransaction = false;
+
+        if (function_exists('wp_set_current_user')) {
+            wp_set_current_user(0);
+        }
+        if (function_exists('wp_cache_flush')) {
+            wp_cache_flush();
+        }
+    }
+
+    private function configureSqlite(): void
+    {
+        $pdo = $GLOBALS['@pdo'] ?? null;
+        if (! $pdo instanceof PDO) {
+            return;
+        }
+
+        $pdo->exec('PRAGMA journal_mode = '.$this->config->sqliteJournalMode());
+        $pdo->exec('PRAGMA synchronous = '.$this->config->sqliteSynchronous());
+    }
+
+    private function applyWordpressOptions(): void
+    {
+        if (! function_exists('update_option')) {
+            return;
+        }
+
+        $filters = $GLOBALS['wp_pest_option_filters'] ?? [];
+
+        foreach ($filters as $option => $filter) {
+            if (function_exists('remove_filter') && is_string($option) && is_callable($filter)) {
+                remove_filter('pre_option_'.$option, $filter);
+            }
+        }
+
+        foreach ($this->config->wordpressOptions() as $option => $value) {
+            if (function_exists('wp_cache_delete')) {
+                wp_cache_delete($option, 'options');
             }
 
-            $headers = $this->callFunction($getFileDataName, $file, ['name' => 'Plugin Name', 'version' => 'Version'], 'plugin');
+            update_option($option, $value);
+        }
 
-            if (is_array($headers) && ($headers['name'] ?? '') !== '') {
-                require_once $file;
-                $this->loadedPlugins[$this->normalizeSlug(basename($path))] = ($headers['version'] ?? '') !== '' ? (string) $headers['version'] : null;
-
-                return;
-            }
+        if (function_exists('wp_cache_flush')) {
+            wp_cache_flush();
         }
     }
 

@@ -49,9 +49,15 @@ final class Application
     private function init(string $workingDirectory, array $arguments): int
     {
         $target = $this->option($arguments, 'target') ?? 'site';
+        $tests = $this->initTests($this->option($arguments, 'tests'));
+        $dependency = $this->option($arguments, 'dependency');
 
         if (! in_array($target, ['site', 'plugin'], true)) {
             throw new ValidationException(['init --target must be either "site" or "plugin".']);
+        }
+
+        if ($dependency !== null && $target !== 'plugin') {
+            throw new ValidationException(['init --dependency may only be used with --target=plugin.']);
         }
 
         $config = $workingDirectory.DIRECTORY_SEPARATOR.'wp-pest.php';
@@ -60,7 +66,7 @@ final class Application
         $gitignore = $workingDirectory.DIRECTORY_SEPARATOR.'.gitignore';
 
         if (! is_file($config)) {
-            file_put_contents($config, file_get_contents($this->initTemplate($target)));
+            file_put_contents($config, $this->initTemplate($target, $tests, $dependency));
             echo "Created wp-pest.php\n";
         }
 
@@ -74,12 +80,16 @@ final class Application
         }
 
         if (! is_file($phpunit) && ! is_file($workingDirectory.DIRECTORY_SEPARATOR.'phpunit.xml')) {
-            file_put_contents($phpunit, file_get_contents(__DIR__.'/../../examples/phpunit.xml.dist'));
+            file_put_contents($phpunit, $this->phpunitTemplate($tests));
             echo "Created phpunit.xml.dist\n";
         }
 
-        $this->copyExampleTests($workingDirectory, $target);
-        $this->appendGitignore($gitignore, [".wp-pest/\n", ".phpunit.cache/\n", "tests/Browser/Screenshots/\n"]);
+        $this->copyExampleTests($workingDirectory, $target, $tests);
+        $gitignoreEntries = [".wp-pest/\n", ".phpunit.cache/\n"];
+        if (in_array('browser', $tests, true)) {
+            $gitignoreEntries[] = "tests/Browser/Screenshots/\n";
+        }
+        $this->appendGitignore($gitignore, $gitignoreEntries);
 
         return 0;
     }
@@ -360,7 +370,7 @@ final class Application
     private function help(): int
     {
         echo "Usage: wp-pest <command>\n";
-        echo "Commands: init [--target=plugin|site], doctor, run, matrix:list, sandbox:start, sandbox:stop, sandbox:reset, sandbox:destroy\n";
+        echo "Commands: init [--target=plugin|site] [--tests=code|browser|code,browser] [--dependency=slug], doctor, run, matrix:list, sandbox:start, sandbox:stop, sandbox:reset, sandbox:destroy\n";
 
         return 0;
     }
@@ -382,12 +392,22 @@ final class Application
         return str_starts_with($path, DIRECTORY_SEPARATOR) ? $path : $workingDirectory.DIRECTORY_SEPARATOR.$path;
     }
 
-    private function initTemplate(string $target): string
+    /** @param list<string> $tests */
+    private function initTemplate(string $target, array $tests, ?string $dependency): string
     {
-        return __DIR__."/../../examples/wp-pest.{$target}.php";
+        $contents = (string) file_get_contents(__DIR__."/../../examples/wp-pest.{$target}.php");
+        $testList = '['.implode(', ', array_map(static fn (string $test): string => "'{$test}'", $tests)).']';
+        $contents = str_replace("['code', 'browser']", $testList, $contents);
+
+        if ($dependency !== null) {
+            $contents = str_replace("'dependencies' => []", "'dependencies' => ['".addslashes($dependency)."']", $contents);
+        }
+
+        return $contents;
     }
 
-    private function copyExampleTests(string $workingDirectory, string $target): void
+    /** @param list<string> $tests */
+    private function copyExampleTests(string $workingDirectory, string $target, array $tests): void
     {
         $examples = [
             'code' => [
@@ -401,6 +421,10 @@ final class Application
         ];
 
         foreach ($examples as [$source, $destination]) {
+            $type = str_contains($destination, DIRECTORY_SEPARATOR.'Browser'.DIRECTORY_SEPARATOR) ? 'browser' : 'code';
+            if (! in_array($type, $tests, true)) {
+                continue;
+            }
             if (is_file($destination)) {
                 continue;
             }
@@ -412,6 +436,30 @@ final class Application
             copy($source, $destination);
             echo 'Created '.str_replace($workingDirectory.DIRECTORY_SEPARATOR, '', $destination).PHP_EOL;
         }
+    }
+
+    /** @return list<string> */
+    private function initTests(?string $tests): array
+    {
+        $selected = $tests === null ? ['code', 'browser'] : array_values(array_unique(array_map('strtolower', array_map('trim', explode(',', $tests)))));
+        if (array_diff($selected, ['code', 'browser']) !== []) {
+            throw new ValidationException(['init --tests must contain code, browser, or both.']);
+        }
+
+        return $selected;
+    }
+
+    /** @param list<string> $tests */
+    private function phpunitTemplate(array $tests): string
+    {
+        $contents = (string) file_get_contents(__DIR__.'/../../examples/phpunit.xml.dist');
+        foreach (['Code' => 'code', 'Browser' => 'browser'] as $suite => $type) {
+            if (! in_array($type, $tests, true)) {
+                $contents = (string) preg_replace("/\s*<testsuite name=\"{$suite}\">.*?<\/testsuite>/s", '', $contents);
+            }
+        }
+
+        return $contents;
     }
 
     /**

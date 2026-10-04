@@ -36,6 +36,15 @@ Use plugin mode when installing into a plugin repository:
 vendor/bin/wp-pest init --target=plugin
 ```
 
+Generate a code-only plugin setup and install a dependency in one command:
+
+```bash
+vendor/bin/wp-pest init --target=plugin --tests=code --dependency=woocommerce
+```
+
+`--tests` accepts `code`, `browser`, or `code,browser`. Browser examples and
+configuration are only generated when browser tests are selected.
+
 `init` creates example tests for the selected target:
 
 - `tests/Code/SiteTest.php` and `tests/Browser/SiteTest.php` for site mode.
@@ -100,6 +109,19 @@ actingAsAdmin()->navigate('/wp-admin/plugins.php')->assertSee('Plugins');
 
 For plugin Code tests, the first run creates a real WordPress fixture under `.wp-pest/fixtures`, backed by the WordPress SQLite integration so no external database service is required. The fixture installs Twenty Twenty-Five from WordPress.org as its default theme, WordPress is installed, and the plugin under test is loaded before the Code suite runs.
 
+Dependency plugins and the plugin under test are activated while the fixture is
+prepared, then the fixture completes one normal WordPress request so deferred
+installation work is ready before Pest starts. The Pest process loads plugins
+through WordPress's normal lifecycle, so `plugins_loaded`, `after_setup_theme`,
+and `init` callbacks run at their expected times. Set `plugins.activate` to
+`false` to mark plugins active without invoking activation hooks.
+
+Generated Code suites wrap each test in a database transaction by default and
+flush WordPress's object cache after rollback. Disable that behavior with
+`database.transactions` when a test intentionally commits or manages its own
+database lifecycle. Disposable SQLite fixtures default to `MEMORY` journaling
+and `synchronous=OFF`; both settings are configurable.
+
 ## Configuration
 
 Create `wp-pest.php` in the project root:
@@ -113,6 +135,14 @@ return [
     'plugins' => [
         'dependencies' => [
             '../shared/local-plugin',
+        ],
+        'activate' => true,
+    ],
+    'database' => [
+        'transactions' => true,
+        'sqlite' => [
+            'journal_mode' => 'MEMORY',
+            'synchronous' => 'OFF',
         ],
     ],
     'sandbox' => [
@@ -213,6 +243,30 @@ wp_pest()->hasPlugin('gravityforms');
 wp_pest()->pluginVersion('gravityforms');
 wp_pest()->pluginVersionIs('gravityforms', '>=2.10.5');
 wp_pest()->bootstrapWordPress(); // manual fallback for custom runners
+wp_pest()->factory()->user->create(['role' => 'editor']);
+wp_pest()->actingAsAdministrator();
+```
+
+Plugin fixtures can enforce WordPress options before the test process loads its
+plugins and throughout each Code test. This is useful when plugin initialization
+or a previous test changes an option value:
+
+```php
+'wordpress' => [
+    'version' => '^6.5',
+    'options' => [
+        'woocommerce_checkout_company_field' => 'optional',
+    ],
+],
+```
+
+The same code-test helpers are available as namespaced functions:
+
+```php
+use function CrossPeak\WpPest\{actingAsAdministrator, factory};
+
+$customerId = factory()->user->create(['role' => 'customer']);
+$administratorId = actingAsAdministrator();
 ```
 
 For Pest-style helpers, import `CrossPeak\WpPest\actingAsAdmin` and `CrossPeak\WpPest\wpEval` as shown above.

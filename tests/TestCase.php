@@ -30,7 +30,11 @@ abstract class TestCase extends BaseTestCase
             );
 
             foreach ($iterator as $file) {
-                $file->isDir() ? rmdir($file->getPathname()) : unlink($file->getPathname());
+                if ($file->isLink() || $file->isFile()) {
+                    unlink($file->getPathname());
+                } else {
+                    rmdir($file->getPathname());
+                }
             }
 
             rmdir($this->workspace);

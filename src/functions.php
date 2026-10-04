@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CrossPeak\WpPest;
 
 use CrossPeak\WpPest\Browser\WpPage;
+use CrossPeak\WpPest\Runtime\Factory;
 use JsonException;
 use LogicException;
 use Pest\Browser\Configuration;
@@ -75,4 +76,20 @@ function actingAsAdmin(): WpPage
         ->assertSee('Dashboard');
 
     return $page;
+}
+
+/**
+ * Access lightweight WordPress data factories for code tests.
+ */
+function factory(): Factory
+{
+    return wp_pest()->factory();
+}
+
+/**
+ * Create and authenticate an administrator for a code test.
+ */
+function actingAsAdministrator(): int
+{
+    return wp_pest()->actingAsAdministrator();
 }
