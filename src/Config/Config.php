@@ -58,6 +58,26 @@ final class Config
         return $this->nullableString('plugin.path') ?? ($this->target() === 'plugin' ? '.' : null);
     }
 
+    public function activatePlugins(): bool
+    {
+        return (bool) $this->get('plugins.activate', true);
+    }
+
+    public function useDatabaseTransactions(): bool
+    {
+        return (bool) $this->get('database.transactions', true);
+    }
+
+    public function sqliteJournalMode(): string
+    {
+        return strtoupper((string) $this->get('database.sqlite.journal_mode', 'MEMORY'));
+    }
+
+    public function sqliteSynchronous(): string
+    {
+        return strtoupper((string) $this->get('database.sqlite.synchronous', 'OFF'));
+    }
+
     public function wordpressVersion(): string
     {
         return $this->activeMatrix()?->wordpress() ?? $this->baseWordpressVersion();
@@ -72,6 +92,14 @@ final class Config
     public function baseWordpressVersion(): string
     {
         return (string) $this->get('wordpress.version', '^7.0');
+    }
+
+    /** @return array<string, mixed> */
+    public function wordpressOptions(): array
+    {
+        $options = $this->get('wordpress.options', []);
+
+        return is_array($options) ? $options : [];
     }
 
     /** @return list<PluginDependency> */

@@ -137,6 +137,28 @@ it('bootstraps wordpress before discovering code tests', function (): void {
     }
 });
 
+it('rolls back sqlite changes between code tests', function (): void {
+    $pdo = new PDO('sqlite::memory:');
+    $pdo->exec('CREATE TABLE example (value TEXT)');
+    $previous = $GLOBALS['@pdo'] ?? null;
+    $GLOBALS['@pdo'] = $pdo;
+
+    try {
+        $runtime = new WpPest((new ConfigLoader)->load($this->workspace), $this->workspace);
+        $runtime->beginDatabaseTransaction();
+        $pdo->exec("INSERT INTO example (value) VALUES ('temporary')");
+        $runtime->rollbackDatabaseTransaction();
+
+        expect($pdo->query('SELECT COUNT(*) FROM example')->fetchColumn())->toBe(0);
+    } finally {
+        if ($previous === null) {
+            unset($GLOBALS['@pdo']);
+        } else {
+            $GLOBALS['@pdo'] = $previous;
+        }
+    }
+});
+
 it('explains that actingAsAdmin requires the optional Pest Browser plugin', function (): void {
     if (class_exists(Configuration::class)) {
         $this->markTestSkipped('Pest Browser is installed in this environment.');

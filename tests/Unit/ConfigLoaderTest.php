@@ -11,8 +11,43 @@ it('loads defaults for a site code target', function (): void {
     expect($config->target())->toBe('site')
         ->and($config->tests())->toBe(['code'])
         ->and($config->hasCodeTests())->toBeTrue()
-        ->and($config->hasBrowserTests())->toBeFalse();
+        ->and($config->hasBrowserTests())->toBeFalse()
+        ->and($config->activatePlugins())->toBeTrue()
+        ->and($config->wordpressOptions())->toBe([])
+        ->and($config->useDatabaseTransactions())->toBeTrue()
+        ->and($config->sqliteJournalMode())->toBe('MEMORY')
+        ->and($config->sqliteSynchronous())->toBe('OFF');
 });
+
+it('loads WordPress fixture options', function (): void {
+    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+<?php
+
+return [
+    'wordpress' => [
+        'options' => [
+            'blogdescription' => 'A test site',
+            'users_can_register' => false,
+        ],
+    ],
+];
+PHP);
+
+    expect((new ConfigLoader)->load($this->workspace)->wordpressOptions())->toBe([
+        'blogdescription' => 'A test site',
+        'users_can_register' => false,
+    ]);
+});
+
+it('rejects a list of WordPress fixture options', function (): void {
+    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+<?php
+
+return ['wordpress' => ['options' => ['invalid']]];
+PHP);
+
+    (new ConfigLoader)->load($this->workspace);
+})->throws(ValidationException::class, 'wordpress.options must be an associative array.');
 
 it('loads plugin target with code and browser tests', function (): void {
     file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'

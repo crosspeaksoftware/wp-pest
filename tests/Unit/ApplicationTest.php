@@ -61,6 +61,37 @@ it('initializes plugin mode when requested', function (): void {
         ->and($this->workspace.'/tests/Browser/PluginTest.php')->toBeFile();
 });
 
+it('initializes a code-only plugin with a dependency', function (): void {
+    $previous = getcwd();
+    chdir($this->workspace);
+    ob_start();
+
+    try {
+        $exitCode = (new Application)->run([
+            'wp-pest',
+            'init',
+            '--target=plugin',
+            '--tests=code',
+            '--dependency=woocommerce',
+        ]);
+    } finally {
+        ob_end_clean();
+        chdir($previous);
+    }
+
+    $config = require $this->workspace.'/wp-pest.php';
+
+    expect($exitCode)->toBe(0)
+        ->and($config['tests'])->toBe(['code'])
+        ->and($config['plugins']['dependencies'])->toBe(['woocommerce'])
+        ->and($config['matrix']['profiles']['default']['tests'])->toBe(['code'])
+        ->and($this->workspace.'/tests/Code/PluginTest.php')->toBeFile()
+        ->and($this->workspace.'/tests/Browser/PluginTest.php')->not->toBeFile()
+        ->and(file_get_contents($this->workspace.'/phpunit.xml.dist'))->toContain('<testsuite name="Code">')
+        ->not->toContain('<testsuite name="Browser">')
+        ->and(file_get_contents($this->workspace.'/.gitignore'))->not->toContain('tests/Browser/Screenshots/');
+});
+
 it('rejects invalid init targets', function (): void {
     $previous = getcwd();
     chdir($this->workspace);

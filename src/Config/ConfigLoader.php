@@ -22,12 +22,21 @@ final class ConfigLoader
             ],
             'wordpress' => [
                 'version' => '^7.0',
+                'options' => [],
             ],
             'plugin' => [
                 'path' => null,
             ],
             'plugins' => [
                 'dependencies' => [],
+                'activate' => true,
+            ],
+            'database' => [
+                'transactions' => true,
+                'sqlite' => [
+                    'journal_mode' => 'MEMORY',
+                    'synchronous' => 'OFF',
+                ],
             ],
             'sandbox' => [
                 'path' => '.wp-pest/sandboxes',
@@ -213,6 +222,37 @@ final class ConfigLoader
 
                 $errors[] = 'Each plugin dependency must be a slug, path, URL, or an array containing slug, path, or url.';
             }
+        }
+
+        if (! is_bool($config['plugins']['activate'] ?? null)) {
+            $errors[] = 'plugins.activate must be a boolean.';
+        }
+
+        $options = $config['wordpress']['options'] ?? null;
+        if (! is_array($options) || ($options !== [] && array_is_list($options))) {
+            $errors[] = 'wordpress.options must be an associative array.';
+        } else {
+            foreach (array_keys($options) as $option) {
+                if (! is_string($option) || $option === '') {
+                    $errors[] = 'wordpress.options keys must be non-empty strings.';
+
+                    break;
+                }
+            }
+        }
+
+        if (! is_bool($config['database']['transactions'] ?? null)) {
+            $errors[] = 'database.transactions must be a boolean.';
+        }
+
+        $journalMode = $config['database']['sqlite']['journal_mode'] ?? null;
+        if (! is_string($journalMode) || ! in_array(strtoupper($journalMode), ['DELETE', 'TRUNCATE', 'PERSIST', 'MEMORY', 'WAL', 'OFF'], true)) {
+            $errors[] = 'database.sqlite.journal_mode must be a valid SQLite journal mode.';
+        }
+
+        $synchronous = $config['database']['sqlite']['synchronous'] ?? null;
+        if (! is_string($synchronous) || ! in_array(strtoupper($synchronous), ['OFF', 'NORMAL', 'FULL', 'EXTRA'], true)) {
+            $errors[] = 'database.sqlite.synchronous must be OFF, NORMAL, FULL, or EXTRA.';
         }
 
         if (! is_array($config['matrix'] ?? null)) {
