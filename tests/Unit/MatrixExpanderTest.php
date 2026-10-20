@@ -6,7 +6,7 @@ use CrossPeak\WpPest\Config\ConfigLoader;
 use CrossPeak\WpPest\Config\ValidationException;
 
 it('expands every wordpress plugin and profile combination', function (): void {
-    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+    file_put_contents($this->workspace.'/tests/wp-pest.php', <<<'PHP'
 <?php
 
 return [
@@ -47,7 +47,7 @@ PHP);
 });
 
 it('applies partial exclusion rules before enforcing the combination limit', function (): void {
-    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+    file_put_contents($this->workspace.'/tests/wp-pest.php', <<<'PHP'
 <?php
 
 return [
@@ -79,7 +79,7 @@ PHP);
 });
 
 it('supports profile plugin inheritance overrides and groups', function (): void {
-    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+    file_put_contents($this->workspace.'/tests/wp-pest.php', <<<'PHP'
 <?php
 
 return [
@@ -108,7 +108,7 @@ PHP);
 });
 
 it('uses profile-overridden plugin versions in generated matrix names', function (): void {
-    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+    file_put_contents($this->workspace.'/tests/wp-pest.php', <<<'PHP'
 <?php
 
 return [
@@ -137,7 +137,7 @@ PHP);
 });
 
 it('expands configured PHP versions and includes them in matrix names', function (): void {
-    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+    file_put_contents($this->workspace.'/tests/wp-pest.php', <<<'PHP'
 <?php
 
 return [
@@ -160,7 +160,7 @@ PHP);
 });
 
 it('rejects invalid PHP matrix versions', function (): void {
-    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+    file_put_contents($this->workspace.'/tests/wp-pest.php', <<<'PHP'
 <?php
 
 return [
@@ -176,7 +176,7 @@ PHP);
 })->throws(ValidationException::class, 'matrix.php must be a non-empty list');
 
 it('rejects exclusions that reference unknown dimensions', function (): void {
-    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+    file_put_contents($this->workspace.'/tests/wp-pest.php', <<<'PHP'
 <?php
 
 return [
@@ -195,7 +195,7 @@ PHP);
 })->throws(ValidationException::class, 'unknown version 0.9.0');
 
 it('rejects matrices above the configured post-exclusion limit', function (): void {
-    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+    file_put_contents($this->workspace.'/tests/wp-pest.php', <<<'PHP'
 <?php
 
 return [

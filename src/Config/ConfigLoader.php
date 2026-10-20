@@ -65,14 +65,14 @@ final class ConfigLoader
 
     public function load(string $workingDirectory): Config
     {
-        $path = rtrim($workingDirectory, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.'wp-pest.php';
+        $path = rtrim($workingDirectory, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.'tests'.DIRECTORY_SEPARATOR.'wp-pest.php';
         $userConfig = [];
 
         if (is_file($path)) {
             $loaded = require $path;
 
             if (! is_array($loaded)) {
-                throw new ValidationException(['wp-pest.php must return an array.']);
+                throw new ValidationException(['tests/wp-pest.php must return an array.']);
             }
 
             $userConfig = $loaded;

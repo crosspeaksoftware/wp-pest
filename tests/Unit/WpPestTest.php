@@ -9,7 +9,7 @@ use Pest\Browser\Configuration;
 use function CrossPeak\WpPest\actingAsAdmin;
 
 it('prefers the active sandbox url over the configured site url', function (): void {
-    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+    file_put_contents($this->workspace.'/tests/wp-pest.php', <<<'PHP'
 <?php
 
 return [
@@ -31,7 +31,7 @@ PHP);
 });
 
 it('resolves relative browser paths against the active WordPress url', function (): void {
-    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+    file_put_contents($this->workspace.'/tests/wp-pest.php', <<<'PHP'
 <?php
 
 return [
@@ -50,7 +50,7 @@ PHP);
 });
 
 it('derives a plugin browser url from the active matrix without an environment override', function (): void {
-    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+    file_put_contents($this->workspace.'/tests/wp-pest.php', <<<'PHP'
 <?php
 
 return [
@@ -76,7 +76,7 @@ PHP);
 });
 
 it('uses active matrix plugin metadata in browser-only runs', function (): void {
-    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+    file_put_contents($this->workspace.'/tests/wp-pest.php', <<<'PHP'
 <?php
 
 return [

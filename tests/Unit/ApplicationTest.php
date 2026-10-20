@@ -6,6 +6,7 @@ use CrossPeak\WpPest\Cli\Application;
 use CrossPeak\WpPest\Support\ProcessRunner;
 
 it('initializes site mode by default', function (): void {
+    rmdir($this->workspace.'/tests');
     file_put_contents($this->workspace.'/.gitignore', 'dist/');
     $previous = getcwd();
     chdir($this->workspace);
@@ -18,9 +19,10 @@ it('initializes site mode by default', function (): void {
         chdir($previous);
     }
 
-    $config = require $this->workspace.'/wp-pest.php';
+    $config = require $this->workspace.'/tests/wp-pest.php';
 
     expect($exitCode)->toBe(0)
+        ->and($this->workspace.'/wp-pest.php')->not->toBeFile()
         ->and($config['target'])->toBe('site')
         ->and($config)->not->toHaveKeys(['plugin', 'plugins', 'sandbox', 'wordpress'])
         ->and($this->workspace.'/tests/Pest.php')->toBeFile()
@@ -38,6 +40,25 @@ it('initializes site mode by default', function (): void {
         ->and(file_get_contents($this->workspace.'/.gitignore'))->toContain('tests/Browser/Screenshots/');
 });
 
+it('preserves an existing tests configuration during initialization', function (): void {
+    $contents = "<?php\nreturn ['target' => 'plugin', 'tests' => ['code']];\n";
+    file_put_contents($this->workspace.'/tests/wp-pest.php', $contents);
+    $previous = getcwd();
+    chdir($this->workspace);
+    ob_start();
+
+    try {
+        $exitCode = (new Application)->run(['wp-pest', 'init']);
+    } finally {
+        ob_end_clean();
+        chdir($previous);
+    }
+
+    expect($exitCode)->toBe(0)
+        ->and(file_get_contents($this->workspace.'/tests/wp-pest.php'))->toBe($contents)
+        ->and($this->workspace.'/wp-pest.php')->not->toBeFile();
+});
+
 it('initializes plugin mode when requested', function (): void {
     $previous = getcwd();
     chdir($this->workspace);
@@ -50,7 +71,7 @@ it('initializes plugin mode when requested', function (): void {
         chdir($previous);
     }
 
-    $config = require $this->workspace.'/wp-pest.php';
+    $config = require $this->workspace.'/tests/wp-pest.php';
 
     expect($exitCode)->toBe(0)
         ->and($config['target'])->toBe('plugin')
@@ -79,7 +100,7 @@ it('initializes a code-only plugin with a dependency', function (): void {
         chdir($previous);
     }
 
-    $config = require $this->workspace.'/wp-pest.php';
+    $config = require $this->workspace.'/tests/wp-pest.php';
 
     expect($exitCode)->toBe(0)
         ->and($config['tests'])->toBe(['code'])
@@ -105,7 +126,7 @@ it('rejects invalid init targets', function (): void {
     }
 
     expect($exitCode)->toBe(1)
-        ->and($this->workspace.'/wp-pest.php')->not->toBeFile();
+        ->and($this->workspace.'/tests/wp-pest.php')->not->toBeFile();
 });
 
 it('runs only code tests when requested', function (): void {
@@ -173,7 +194,7 @@ it('does not forward wp-pest options to pest', function (): void {
 });
 
 it('explains that socket_create_listen() is required before browser tests start', function (): void {
-    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+    file_put_contents($this->workspace.'/tests/wp-pest.php', <<<'PHP'
 <?php
 
 return [
@@ -202,7 +223,7 @@ PHP);
 });
 
 it('allows Code-only runs without socket functions', function (): void {
-    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+    file_put_contents($this->workspace.'/tests/wp-pest.php', <<<'PHP'
 <?php
 
 return [
@@ -229,7 +250,7 @@ function prepareRunWorkspace(string $workspace): void
     mkdir($workspace.'/vendor/bin', 0775, true);
     file_put_contents($workspace.'/wp-load.php', '<?php');
     file_put_contents($workspace.'/vendor/bin/pest', '');
-    file_put_contents($workspace.'/wp-pest.php', <<<'PHP'
+    file_put_contents($workspace.'/tests/wp-pest.php', <<<'PHP'
 <?php
 
 return [

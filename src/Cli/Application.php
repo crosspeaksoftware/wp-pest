@@ -60,18 +60,18 @@ final class Application
             throw new ValidationException(['init --dependency may only be used with --target=plugin.']);
         }
 
-        $config = $workingDirectory.DIRECTORY_SEPARATOR.'wp-pest.php';
+        $config = $workingDirectory.DIRECTORY_SEPARATOR.'tests'.DIRECTORY_SEPARATOR.'wp-pest.php';
         $pest = $workingDirectory.DIRECTORY_SEPARATOR.'tests'.DIRECTORY_SEPARATOR.'Pest.php';
         $phpunit = $workingDirectory.DIRECTORY_SEPARATOR.'phpunit.xml.dist';
         $gitignore = $workingDirectory.DIRECTORY_SEPARATOR.'.gitignore';
 
-        if (! is_file($config)) {
-            file_put_contents($config, $this->initTemplate($target, $tests, $dependency));
-            echo "Created wp-pest.php\n";
-        }
-
         if (! is_dir(dirname($pest))) {
             mkdir(dirname($pest), 0775, true);
+        }
+
+        if (! is_file($config)) {
+            file_put_contents($config, $this->initTemplate($target, $tests, $dependency));
+            echo "Created tests/wp-pest.php\n";
         }
 
         if (! is_file($pest)) {
@@ -395,7 +395,7 @@ final class Application
     /** @param list<string> $tests */
     private function initTemplate(string $target, array $tests, ?string $dependency): string
     {
-        $contents = (string) file_get_contents(__DIR__."/../../examples/wp-pest.{$target}.php");
+        $contents = (string) file_get_contents(__DIR__."/../../examples/tests/wp-pest.{$target}.php");
         $testList = '['.implode(', ', array_map(static fn (string $test): string => "'{$test}'", $tests)).']';
         $contents = str_replace("['code', 'browser']", $testList, $contents);
 

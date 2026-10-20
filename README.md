@@ -67,7 +67,7 @@ WP_PEST_SANDBOX=local vendor/bin/wp-pest run --tests=browser --matrix=<name>
 WP_PEST_SANDBOX=docker vendor/bin/wp-pest run --tests=browser --matrix=<name>
 ```
 
-The local driver copies the cached WordPress fixture, uses SQLite, runs PHP's built-in server, and executes WP-CLI locally. It requires PHP CLI, the SQLite extension, WP-CLI, and the browser test dependencies. Set `sandbox.driver` to `local`, `docker`, or `auto` in `wp-pest.php`; `WP_PEST_SANDBOX` takes precedence over that setting.
+The local driver copies the cached WordPress fixture, uses SQLite, runs PHP's built-in server, and executes WP-CLI locally. It requires PHP CLI, the SQLite extension, WP-CLI, and the browser test dependencies. Set `sandbox.driver` to `local`, `docker`, or `auto` in `tests/wp-pest.php`; `WP_PEST_SANDBOX` takes precedence over that setting.
 
 The generated `tests/Pest.php` bootstraps WordPress before Code test files are discovered, while Browser-only runs skip the local WordPress fixture.
 It also increases Pest Browser's default wait timeout from five seconds to one minute.
@@ -124,7 +124,7 @@ and `synchronous=OFF`; both settings are configurable.
 
 ## Configuration
 
-Create `wp-pest.php` in the project root:
+Create `tests/wp-pest.php`:
 
 ```php
 <?php

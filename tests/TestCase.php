@@ -18,7 +18,7 @@ abstract class TestCase extends BaseTestCase
         parent::setUp();
 
         $this->workspace = sys_get_temp_dir().'/wp-pest-test-'.bin2hex(random_bytes(6));
-        mkdir($this->workspace, 0775, true);
+        mkdir($this->workspace.'/tests', 0775, true);
     }
 
     protected function tearDown(): void

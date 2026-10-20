@@ -19,8 +19,15 @@ it('loads defaults for a site code target', function (): void {
         ->and($config->sqliteSynchronous())->toBe('OFF');
 });
 
+it('loads the tests configuration instead of a root configuration', function (): void {
+    file_put_contents($this->workspace.'/wp-pest.php', "<?php\nthrow new RuntimeException('Root configuration must not be loaded.');\n");
+    file_put_contents($this->workspace.'/tests/wp-pest.php', "<?php\nreturn ['target' => 'plugin'];\n");
+
+    expect((new ConfigLoader)->load($this->workspace)->target())->toBe('plugin');
+});
+
 it('loads WordPress fixture options', function (): void {
-    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+    file_put_contents($this->workspace.'/tests/wp-pest.php', <<<'PHP'
 <?php
 
 return [
@@ -40,7 +47,7 @@ PHP);
 });
 
 it('rejects a list of WordPress fixture options', function (): void {
-    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+    file_put_contents($this->workspace.'/tests/wp-pest.php', <<<'PHP'
 <?php
 
 return ['wordpress' => ['options' => ['invalid']]];
@@ -50,7 +57,7 @@ PHP);
 })->throws(ValidationException::class, 'wordpress.options must be an associative array.');
 
 it('loads plugin target with code and browser tests', function (): void {
-    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+    file_put_contents($this->workspace.'/tests/wp-pest.php', <<<'PHP'
 <?php
 
 return [
@@ -76,7 +83,7 @@ PHP);
 });
 
 it('uses the top-level tests and wordpress settings for the default matrix', function (): void {
-    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+    file_put_contents($this->workspace.'/tests/wp-pest.php', <<<'PHP'
 <?php
 
 return [
@@ -95,7 +102,7 @@ PHP);
 });
 
 it('requires a url for site browser tests', function (): void {
-    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+    file_put_contents($this->workspace.'/tests/wp-pest.php', <<<'PHP'
 <?php
 
 return [
@@ -108,7 +115,7 @@ PHP);
 })->throws(ValidationException::class, 'site.url is required');
 
 it('defaults the plugin path to the current directory', function (): void {
-    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+    file_put_contents($this->workspace.'/tests/wp-pest.php', <<<'PHP'
 <?php
 
 return [
@@ -123,7 +130,7 @@ PHP);
 });
 
 it('rejects invalid plugin dependency definitions', function (): void {
-    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+    file_put_contents($this->workspace.'/tests/wp-pest.php', <<<'PHP'
 <?php
 
 return [

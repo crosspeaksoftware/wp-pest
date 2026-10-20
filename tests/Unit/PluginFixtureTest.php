@@ -7,7 +7,7 @@ use CrossPeak\WpPest\Sandbox\PluginFixture;
 use CrossPeak\WpPest\Support\ProcessRunner;
 
 it('configures plugin code fixtures with WordPress and SQLite', function (): void {
-    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+    file_put_contents($this->workspace.'/tests/wp-pest.php', <<<'PHP'
 <?php
 
 return [
@@ -99,7 +99,7 @@ PHP);
 });
 
 it('flattens plugin archives with a redundant inner plugin directory', function (): void {
-    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+    file_put_contents($this->workspace.'/tests/wp-pest.php', <<<'PHP'
 <?php
 
 return [
@@ -134,7 +134,7 @@ PHP);
 });
 
 it('prepares a clean database when the plugin source changes at the same plugin filename', function (): void {
-    $configFile = $this->workspace.'/wp-pest.php';
+    $configFile = $this->workspace.'/tests/wp-pest.php';
     file_put_contents($configFile, "<?php return ['target' => 'plugin', 'tests' => ['code'], 'plugin' => ['path' => 'plugin-a']];");
     foreach (['plugin-a', 'plugin-b'] as $plugin) {
         mkdir($this->workspace.'/'.$plugin);

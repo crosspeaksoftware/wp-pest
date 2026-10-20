@@ -18,7 +18,7 @@ afterEach(function (): void {
 });
 
 it('selects all matrix entries', function (): void {
-    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+    file_put_contents($this->workspace.'/tests/wp-pest.php', <<<'PHP'
 <?php
 
 return [
@@ -41,7 +41,7 @@ PHP);
 });
 
 it('rejects unknown matrix entries', function (): void {
-    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+    file_put_contents($this->workspace.'/tests/wp-pest.php', <<<'PHP'
 <?php
 
 return [
@@ -59,7 +59,7 @@ PHP);
 
 it('writes compose files for matrix entries', function (): void {
     mkdir($this->workspace.'/plugin');
-    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+    file_put_contents($this->workspace.'/tests/wp-pest.php', <<<'PHP'
 <?php
 
 return [
@@ -103,7 +103,7 @@ PHP);
 
 it('allows the wp-cli container user to be overridden', function (): void {
     mkdir($this->workspace.'/plugin');
-    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+    file_put_contents($this->workspace.'/tests/wp-pest.php', <<<'PHP'
 <?php
 
 return [
@@ -131,7 +131,7 @@ PHP);
 
 it('downloads the exact resolved wordpress version into the browser volume', function (): void {
     mkdir($this->workspace.'/plugin');
-    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+    file_put_contents($this->workspace.'/tests/wp-pest.php', <<<'PHP'
 <?php
 
 return [
@@ -170,7 +170,7 @@ PHP);
 });
 
 it('removes sandbox volumes before a fresh start', function (): void {
-    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+    file_put_contents($this->workspace.'/tests/wp-pest.php', <<<'PHP'
 <?php
 
 return [
@@ -200,7 +200,7 @@ it('seeds a fresh wordpress volume from the resolved fixture cache', function ()
     mkdir($this->workspace.'/cache/wp-includes', 0775, true);
     mkdir($this->workspace.'/cache/wp-content/themes/twentytwentyfive', 0775, true);
     file_put_contents($this->workspace.'/cache/wp-load.php', '<?php');
-    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+    file_put_contents($this->workspace.'/tests/wp-pest.php', <<<'PHP'
 <?php
 
 return [
@@ -237,7 +237,7 @@ PHP);
 it('installs and activates configured plugin dependencies in browser sandboxes', function (): void {
     mkdir($this->workspace.'/plugin');
     mkdir($this->workspace.'/local-addon');
-    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+    file_put_contents($this->workspace.'/tests/wp-pest.php', <<<'PHP'
 <?php
 
 return [
@@ -287,7 +287,7 @@ PHP);
 it('mounts and activates the exact plugin copy resolved for a matrix fixture', function (): void {
     mkdir($this->workspace.'/plugin');
     mkdir($this->workspace.'/fixture/wp-content/plugins/query-monitor', 0775, true);
-    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+    file_put_contents($this->workspace.'/tests/wp-pest.php', <<<'PHP'
 <?php
 
 return [
@@ -322,7 +322,7 @@ PHP);
 });
 
 it('runs wp-cli commands in a matrix sandbox and captures stdout', function (): void {
-    file_put_contents($this->workspace.'/wp-pest.php', <<<'PHP'
+    file_put_contents($this->workspace.'/tests/wp-pest.php', <<<'PHP'
 <?php
 
 return [
