@@ -6,6 +6,7 @@ namespace CrossPeak\WpPest;
 
 use CrossPeak\WpPest\Browser\WpPage;
 use CrossPeak\WpPest\Runtime\Factory;
+use CrossPeak\WpPest\Runtime\SandboxEvaluator;
 use JsonException;
 use LogicException;
 use Pest\Browser\Configuration;
@@ -14,24 +15,36 @@ use RuntimeException;
 /**
  * Evaluate PHP in the active wp-pest plugin sandbox and return its JSON-compatible result.
  *
- * The supplied code runs inside a closure with the WordPress database global available.
+ * The supplied code runs inside a closure with $args and the WordPress database global available.
  * Return a scalar or array from the code to receive it in the test process.
  *
- * @throws JsonException When the sandbox result is not valid JSON.
- * @throws RuntimeException When WP-CLI does not return a result marker.
+ * @param  array<array-key, mixed>  $arguments  JSON-compatible input exposed as $args.
+ *
+ * @throws JsonException When arguments cannot be encoded or the response cannot be decoded.
+ * @throws RuntimeException When sandbox execution fails or WP-CLI does not return result markers.
  */
-function wpEval(string $code): mixed
+function wpEval(string $code, array $arguments = []): mixed
 {
-    $marker = '__WP_PEST_RESULT_'.bin2hex(random_bytes(12)).'__';
-    $script = 'global $wpdb; $result = (static function () { global $wpdb; '."\n".$code."\n".'})(); echo '.var_export("\n{$marker}", true).' . wp_json_encode($result);';
-    $output = wp_pest()->wpCli(['eval', $script]);
-    $position = strrpos($output, $marker);
+    return (new SandboxEvaluator(wp_pest()->wpCli(...)))->evaluate($code, $arguments);
+}
 
-    if ($position === false) {
-        throw new RuntimeException('WP-CLI did not return the expected wpEval result marker. Output: '.$output);
+/**
+ * Require a plugin-local PHP fixture inside the active sandbox with $args and $wpdb available.
+ *
+ * The file executes from the sandbox's plugin directory, preserving __DIR__ and relative includes.
+ * Return a JSON-compatible value from the fixture to receive it in the test process.
+ *
+ * @param  array<array-key, mixed>  $arguments
+ */
+function wpEvalFile(string $path, array $arguments = []): mixed
+{
+    $runtime = wp_pest();
+    $pluginPath = $runtime->pluginPath();
+    if ($runtime->target() !== 'plugin' || $pluginPath === null) {
+        throw new LogicException('wpEvalFile() requires a plugin browser sandbox.');
     }
 
-    return json_decode(trim(substr($output, $position + strlen($marker))), true, 512, JSON_THROW_ON_ERROR);
+    return (new SandboxEvaluator($runtime->wpCli(...)))->evaluateFile($path, $arguments, $pluginPath);
 }
 
 /**

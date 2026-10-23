@@ -105,7 +105,55 @@ visit($form['path'])->assertSee('Test Form');
 actingAsAdmin()->navigate('/wp-admin/plugins.php')->assertSee('Plugins');
 ```
 
-`wpEval()` runs the provided PHP body in the active plugin sandbox with `$wpdb` available and returns its JSON-compatible result. The WordPress site runs in a separate Docker/PHP process, unlike a Laravel app booted inside Pest's process, so WordPress objects and services cannot be used directly in the test process. `wpEval()` is the RPC boundary for setup and inspection; keep returned values JSON-compatible and use `wp_pest()->wpCli()` when full WP-CLI output or a non-PHP CLI command is needed. `actingAsAdmin()` is limited to plugin browser sandboxes, logs in with the seeded `admin` / `password` account, and returns a relative-navigation-aware browser page for chaining. These helpers require the optional Pest Browser plugin when used.
+Pass data separately from PHP source; it is exposed as `$args` inside the sandbox:
+
+```php
+use function CrossPeak\WpPest\{wpEval, wpEvalFile};
+
+$name = wpEval('return get_option($args["option"]);', ['option' => 'blogname']);
+
+$page = wpEvalFile(__DIR__.'/fixtures/create-page.php', [
+    'title' => 'A page with "quotes" and Unicode 東京',
+]);
+visit($page['path'])->assertSee($page['title']);
+```
+
+The fixture `tests/fixtures/create-page.php` contains ordinary PHP:
+
+```php
+<?php
+
+$id = wp_insert_post([
+    'post_title' => $args['title'],
+    'post_type' => 'page',
+    'post_status' => 'publish',
+], true);
+if (is_wp_error($id)) {
+    throw new RuntimeException($id->get_error_message());
+}
+
+return [
+    'id' => $id,
+    'title' => get_the_title($id),
+    'path' => wp_make_link_relative(get_permalink($id)),
+];
+```
+
+`wpEvalFile()` accepts a readable file inside the plugin under test. Absolute paths
+and paths relative to Pest's working directory are supported. The corresponding
+file is required from the sandbox's plugin copy in both local and Docker drivers,
+so `__FILE__`, `__DIR__`, relative includes, and PHP error locations refer to the
+fixture in that sandbox. Local sandboxes copy files at startup; restart the sandbox
+after editing a fixture during a manually managed session. Fixture files should
+explicitly return their result (`require` otherwise returns `1`).
+
+Both helpers expose `$args` and the WordPress `$wpdb` global. Arguments and return
+values must be JSON-compatible; objects cross the boundary as associative arrays.
+Use arrays and scalar values rather than PHP services or closures. Resources,
+recursive data, non-finite numbers, and invalid UTF-8 produce JSON encoding errors. Fixture output and plugin output are ignored around the
+returned result. Existing single-argument `wpEval($code)` calls remain supported.
+
+`wpEval()` runs the provided PHP body in the active plugin sandbox with `$wpdb` available and returns its JSON-compatible result. The WordPress site runs in a separate Docker/PHP process, unlike a Laravel app booted inside Pest's process, so WordPress objects and services cannot be used directly in the test process. `wpEval()` and `wpEvalFile()` are the RPC boundary for setup and inspection; keep returned values JSON-compatible and use `wp_pest()->wpCli()` when full WP-CLI output or a non-PHP CLI command is needed. `actingAsAdmin()` is limited to plugin browser sandboxes, logs in with the seeded `admin` / `password` account, and returns a relative-navigation-aware browser page for chaining. These helpers require the optional Pest Browser plugin when used.
 
 For plugin Code tests, the first run creates a real WordPress fixture under `<system-temp>/wp-pest-<project-hash>/fixtures`, backed by the WordPress SQLite integration so no external database service is required. Fixtures are cached separately for each project outside the plugin source tree, so symlinked plugins cannot cause WordPress to misidentify dependency paths. System temporary-directory cleanup may evict this cache; the next run recreates it. Existing `.wp-pest/fixtures` directories are no longer used and may be removed. The fixture installs Twenty Twenty-Five from WordPress.org as its default theme, WordPress is installed, and the plugin under test is loaded before the Code suite runs.
 
