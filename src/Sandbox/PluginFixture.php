@@ -29,7 +29,13 @@ final class PluginFixture
 
     public function pathFor(string $name): string
     {
-        return $this->workingDirectory.DIRECTORY_SEPARATOR.'.wp-pest'.DIRECTORY_SEPARATOR.'fixtures'.DIRECTORY_SEPARATOR.$name;
+        // Keep WordPress outside every plugin source tree: an ancestor symlink
+        // otherwise makes plugin_basename() rewrite dependency paths as children
+        // of the plugin under test. The project hash keeps caches independent.
+        $project = realpath($this->workingDirectory) ?: $this->workingDirectory;
+        $root = sys_get_temp_dir().DIRECTORY_SEPARATOR.'wp-pest-'.hash('sha256', $project);
+
+        return $root.DIRECTORY_SEPARATOR.'fixtures'.DIRECTORY_SEPARATOR.$name;
     }
 
     public function ensure(): string
@@ -37,7 +43,7 @@ final class PluginFixture
         $path = $this->path();
 
         if (! is_dir($path)) {
-            mkdir($path, 0775, true);
+            mkdir($path, 0700, true);
         }
 
         $composerJson = $path.DIRECTORY_SEPARATOR.'composer.json';

@@ -107,7 +107,7 @@ actingAsAdmin()->navigate('/wp-admin/plugins.php')->assertSee('Plugins');
 
 `wpEval()` runs the provided PHP body in the active plugin sandbox with `$wpdb` available and returns its JSON-compatible result. The WordPress site runs in a separate Docker/PHP process, unlike a Laravel app booted inside Pest's process, so WordPress objects and services cannot be used directly in the test process. `wpEval()` is the RPC boundary for setup and inspection; keep returned values JSON-compatible and use `wp_pest()->wpCli()` when full WP-CLI output or a non-PHP CLI command is needed. `actingAsAdmin()` is limited to plugin browser sandboxes, logs in with the seeded `admin` / `password` account, and returns a relative-navigation-aware browser page for chaining. These helpers require the optional Pest Browser plugin when used.
 
-For plugin Code tests, the first run creates a real WordPress fixture under `.wp-pest/fixtures`, backed by the WordPress SQLite integration so no external database service is required. The fixture installs Twenty Twenty-Five from WordPress.org as its default theme, WordPress is installed, and the plugin under test is loaded before the Code suite runs.
+For plugin Code tests, the first run creates a real WordPress fixture under `<system-temp>/wp-pest-<project-hash>/fixtures`, backed by the WordPress SQLite integration so no external database service is required. Fixtures are cached separately for each project outside the plugin source tree, so symlinked plugins cannot cause WordPress to misidentify dependency paths. System temporary-directory cleanup may evict this cache; the next run recreates it. Existing `.wp-pest/fixtures` directories are no longer used and may be removed. The fixture installs Twenty Twenty-Five from WordPress.org as its default theme, WordPress is installed, and the plugin under test is loaded before the Code suite runs.
 
 Dependency plugins and the plugin under test are activated while the fixture is
 prepared, then the fixture completes one normal WordPress request so deferred
@@ -116,10 +116,39 @@ through WordPress's normal lifecycle, so `plugins_loaded`, `after_setup_theme`,
 and `init` callbacks run at their expected times. Set `plugins.activate` to
 `false` to mark plugins active without invoking activation hooks.
 
-Generated Code suites wrap each test in a database transaction by default and
-flush WordPress's object cache after rollback. Disable that behavior with
-`database.transactions` when a test intentionally commits or manages its own
-database lifecycle. Disposable SQLite fixtures default to `MEMORY` journaling
+Generated Code suites extend `CrossPeak\WpPest\WordPressTestCase`. Existing suites
+can enable the same lifecycle in `tests/Pest.php`, alongside the WordPress bootstrap:
+
+```php
+pest()->extend(\CrossPeak\WpPest\WordPressTestCase::class)->in('Code');
+```
+
+Remove any existing `beginDatabaseTransaction()` / `rollbackDatabaseTransaction()`
+hooks when adopting this test case. It starts a transaction before Pest's
+`beforeEach` hooks and rolls it back after `afterEach` hooks, even when a test or
+cleanup callback fails. It also flushes the object cache and restores request
+variables, hooks and action counts, the current user and screen, query globals,
+admin menu globals, and script/style registries to their pre-test state.
+
+Disable database rollback with `database.transactions` when a test intentionally
+commits or manages its own database lifecycle. Request-state restoration and cache
+flushing still run. MySQL DDL and explicit commits can escape a transaction;
+those tests need their own database cleanup.
+
+Plugin singleton/static state and filesystem writes need explicit cleanup. Register
+callbacks as soon as you change that state; callbacks run in reverse order while
+WordPress and the test transaction are still available:
+
+```php
+$this->deferCleanup(static function () use ($path): void {
+    if (is_file($path)) {
+        unlink($path);
+    }
+});
+```
+
+These helpers isolate in-process Code tests. Browser tests execute in a separate
+WordPress process and continue to use the sandbox lifecycle. Disposable SQLite fixtures default to `MEMORY` journaling
 and `synchronous=OFF`; both settings are configurable.
 
 ## Configuration

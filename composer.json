@@ -42,7 +42,8 @@
     "analyse": "./vendor/bin/phpstan analyse",
     "test": "./vendor/bin/pest",
     "format": "./vendor/bin/pint",
-    "format:test": "./vendor/bin/pint --test"
+    "format:test": "./vendor/bin/pint --test",
+    "test:integration": "cd tests/Integration && ../../vendor/bin/pest --test-directory=tests/Integration/tests"
   },
   "extra": {
     "pest": {

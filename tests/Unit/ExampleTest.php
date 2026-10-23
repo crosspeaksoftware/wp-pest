@@ -19,8 +19,7 @@ it('bootstraps wordpress only for code tests', function (): void {
     expect($pest)->toContain(
         'shouldBootstrapWordPress',
         'bootstrapWordPress',
-        'beginDatabaseTransaction',
-        'rollbackDatabaseTransaction',
+        'WordPressTestCase',
     );
 });
 

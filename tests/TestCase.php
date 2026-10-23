@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests;
 
+use CrossPeak\WpPest\Config\Config;
+use CrossPeak\WpPest\Sandbox\PluginFixture;
 use FilesystemIterator;
 use PHPUnit\Framework\TestCase as BaseTestCase;
 use RecursiveDirectoryIterator;
@@ -23,9 +25,21 @@ abstract class TestCase extends BaseTestCase
 
     protected function tearDown(): void
     {
-        if (isset($this->workspace) && is_dir($this->workspace)) {
+        if (! isset($this->workspace)) {
+            parent::tearDown();
+
+            return;
+        }
+
+        $fixture = (new PluginFixture(
+            new Config([]), $this->workspace,
+        ))->pathFor('unused');
+        foreach ([$this->workspace, dirname($fixture, 2)] as $directory) {
+            if (! is_dir($directory)) {
+                continue;
+            }
             $iterator = new RecursiveIteratorIterator(
-                new RecursiveDirectoryIterator($this->workspace, FilesystemIterator::SKIP_DOTS),
+                new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS),
                 RecursiveIteratorIterator::CHILD_FIRST,
             );
 
@@ -37,7 +51,7 @@ abstract class TestCase extends BaseTestCase
                 }
             }
 
-            rmdir($this->workspace);
+            rmdir($directory);
         }
 
         parent::tearDown();

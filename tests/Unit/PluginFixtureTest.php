@@ -30,7 +30,7 @@ return [
 ];
 PHP);
 
-    $fixturePath = $this->workspace.'/.wp-pest/fixtures/default--wp-7.0';
+    $fixturePath = (new PluginFixture((new ConfigLoader)->load($this->workspace), $this->workspace))->path();
     $contentPath = $fixturePath.'/wordpress/wp-content';
     mkdir($contentPath.'/plugins/sqlite-database-integration', 0775, true);
     mkdir($contentPath.'/plugins/akismet', 0775, true);
@@ -115,7 +115,7 @@ return [
 ];
 PHP);
 
-    $fixturePath = $this->workspace.'/.wp-pest/fixtures/default--wp-7.0';
+    $fixturePath = (new PluginFixture((new ConfigLoader)->load($this->workspace), $this->workspace))->path();
     $wordpressPath = $fixturePath.'/wordpress';
     $contentPath = $wordpressPath.'/wp-content';
     mkdir($contentPath.'/plugins/sqlite-database-integration', 0775, true);
@@ -141,7 +141,7 @@ it('prepares a clean database when the plugin source changes at the same plugin 
         file_put_contents($this->workspace.'/'.$plugin.'/plugin.php', "<?php\n/* Plugin Name: {$plugin} */");
     }
 
-    $fixturePath = $this->workspace.'/.wp-pest/fixtures/default--wp-7.0';
+    $fixturePath = (new PluginFixture((new ConfigLoader)->load($this->workspace), $this->workspace))->path();
     $wordpressPath = $fixturePath.'/wordpress';
     $contentPath = $wordpressPath.'/wp-content';
     mkdir($contentPath.'/plugins/sqlite-database-integration', 0775, true);

@@ -326,10 +326,22 @@ final class WpPest
             return;
         }
 
+        // SQLite's WordPress adapter tracks transaction nesting itself. Going
+        // directly through PDO makes its next query try to start a second one.
+        $database = $GLOBALS['wpdb'] ?? null;
+        if (is_object($database) && method_exists($database, 'query')) {
+            if ($database->query('START TRANSACTION') === false) {
+                throw new RuntimeException('Unable to start the WordPress test transaction.');
+            }
+            $this->databaseTransactionActive = true;
+
+            return;
+        }
+
         $pdo = $GLOBALS['@pdo'] ?? null;
         if ($pdo instanceof PDO) {
             if ($pdo->inTransaction()) {
-                $pdo->rollBack();
+                throw new RuntimeException('A database transaction is already active before the WordPress test.');
             }
 
             $pdo->beginTransaction();
@@ -337,12 +349,6 @@ final class WpPest
             $this->databaseTransactionActive = true;
 
             return;
-        }
-
-        $database = $GLOBALS['wpdb'] ?? null;
-        if (is_object($database) && method_exists($database, 'query')) {
-            $database->query('START TRANSACTION');
-            $this->databaseTransactionActive = true;
         }
     }
 
@@ -352,18 +358,20 @@ final class WpPest
             return;
         }
 
-        $pdo = $GLOBALS['@pdo'] ?? null;
-        if ($this->sqliteTransaction && $pdo instanceof PDO && $pdo->inTransaction()) {
-            $pdo->rollBack();
-        } else {
-            $database = $GLOBALS['wpdb'] ?? null;
-            if (is_object($database) && method_exists($database, 'query')) {
-                $database->query('ROLLBACK');
+        try {
+            $pdo = $GLOBALS['@pdo'] ?? null;
+            if ($this->sqliteTransaction && $pdo instanceof PDO && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            } else {
+                $database = $GLOBALS['wpdb'] ?? null;
+                if (is_object($database) && method_exists($database, 'query') && $database->query('ROLLBACK') === false) {
+                    throw new RuntimeException('Unable to roll back the WordPress test transaction.');
+                }
             }
+        } finally {
+            $this->databaseTransactionActive = false;
+            $this->sqliteTransaction = false;
         }
-
-        $this->databaseTransactionActive = false;
-        $this->sqliteTransaction = false;
 
         if (function_exists('wp_set_current_user')) {
             wp_set_current_user(0);

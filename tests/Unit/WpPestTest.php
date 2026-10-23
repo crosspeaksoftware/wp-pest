@@ -166,3 +166,26 @@ it('explains that actingAsAdmin requires the optional Pest Browser plugin', func
 
     expect(actingAsAdmin(...))->toThrow(LogicException::class, 'actingAsAdmin() requires pestphp/pest-plugin-browser.');
 });
+
+it('does not roll back an existing PDO transaction when starting isolation', function (): void {
+    $pdo = new PDO('sqlite::memory:');
+    $pdo->exec('CREATE TABLE example (value TEXT)');
+    $pdo->beginTransaction();
+    $pdo->exec("INSERT INTO example VALUES ('owned by caller')");
+    $previous = $GLOBALS['@pdo'] ?? null;
+    $GLOBALS['@pdo'] = $pdo;
+
+    try {
+        $runtime = new WpPest((new ConfigLoader)->load($this->workspace), $this->workspace);
+        expect($runtime->beginDatabaseTransaction(...))->toThrow(RuntimeException::class, 'already active')
+            ->and($pdo->inTransaction())->toBeTrue()
+            ->and($pdo->query('SELECT COUNT(*) FROM example')->fetchColumn())->toBe(1);
+    } finally {
+        $pdo->rollBack();
+        if ($previous === null) {
+            unset($GLOBALS['@pdo']);
+        } else {
+            $GLOBALS['@pdo'] = $previous;
+        }
+    }
+});
