@@ -489,6 +489,66 @@ They do not dispatch an action, modify request data, or bypass nonce/capability
 checks; prepare the request and user explicitly. A direct `exit` or `die` outside
 `wp_die()` still terminates the process.
 
+## Mail capture and scoped filters
+
+Capture `wp_mail()` attempts during a callback without invoking PHPMailer or an
+external mail transport:
+
+```php
+use CrossPeak\WpPest\MailMessage;
+use function CrossPeak\WpPest\captureMail;
+
+$mail = captureMail(fn () => send_my_notification());
+$mail->assertCount(1)
+    ->assertSentTo('reader@example.test')
+    ->assertSubject('Submission received')
+    ->assertBodyContains('Thank you')
+    ->assertAttachment($path);
+
+// Require all conditions to match the same message.
+$mail->assertSent(fn (MailMessage $message) =>
+    $message->hasRecipient('reader@example.test') &&
+    $message->subject === 'Submission received'
+);
+
+captureMail(fn () => run_without_notifications())->assertNothingSent();
+```
+
+`$mail->messages` contains immutable `MailMessage` objects with `to`, `subject`,
+`body`, and `attachments`. Their `attributes` retain the original `pre_wp_mail`
+arguments, including headers. Recipient matching handles comma-separated lists,
+arrays, display names, and email casing. Subject assertions match exactly; body
+assertions look for a substring; attachment assertions match a path.
+
+These are attempted messages before WordPress validates recipients, processes
+headers, or accesses attachment files. The recorder simulates a successful send
+by short-circuiting `pre_wp_mail`; it does not verify deliverability or file
+contents. Earlier filters still run, but their return value is overridden during
+capture. Each convenience assertion searches any captured message; use
+`assertSent()` to match several conditions on one message. An outer capture
+includes messages attempted by nested captures. Filters restore immediately on
+exit, and exceptions from the callback propagate normally.
+
+Temporarily add or override a filter for one operation:
+
+```php
+use function CrossPeak\WpPest\withFilter;
+
+$value = withFilter(
+    'my_plugin_can_decrypt',
+    '__return_false',
+    fn () => render_my_entry()
+);
+
+withFilter('my_plugin_setting', $override, fn () => check_settings(), 10, 2);
+```
+
+The last two arguments are WordPress's priority and accepted argument count.
+`withFilter()` returns the callback's result and restores the hook's complete
+original callback registry, including priorities and accepted argument counts,
+even after nested scopes or exceptions. Changes to other hooks remain intact.
+These are in-process Code-test helpers; browser requests run in another process.
+
 ## CI overrides
 
 - `WP_PEST_TARGET`

@@ -9,6 +9,7 @@ use CrossPeak\WpPest\Runtime\AdminScreen;
 use CrossPeak\WpPest\Runtime\Factory;
 use CrossPeak\WpPest\Runtime\ResponseCapture;
 use CrossPeak\WpPest\Runtime\SandboxEvaluator;
+use CrossPeak\WpPest\Runtime\ScopedFilter;
 use JsonException;
 use LogicException;
 use Pest\Browser\Configuration;
@@ -175,4 +176,23 @@ function actingAsRole(string $role): int
 function actingAsGuest(): void
 {
     wp_pest()->actingAsGuest();
+}
+
+/** Restore a hook's original callbacks immediately after the callback, including on failure. */
+function withFilter(string $hook, callable $filter, callable $callback, int $priority = 10, int $acceptedArgs = 1): mixed
+{
+    return ScopedFilter::run($hook, $filter, $callback, $priority, $acceptedArgs);
+}
+
+/** Capture attempted wp_mail calls and simulate success without invoking a mail transport. */
+function captureMail(callable $callback): MailRecorder
+{
+    $messages = [];
+    withFilter('pre_wp_mail', static function ($result, array $attributes) use (&$messages): bool {
+        $messages[] = new MailMessage($attributes);
+
+        return true;
+    }, $callback, PHP_INT_MAX, 2);
+
+    return new MailRecorder($messages);
 }
