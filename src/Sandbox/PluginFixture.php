@@ -6,6 +6,7 @@ namespace CrossPeak\WpPest\Sandbox;
 
 use CrossPeak\WpPest\Config\Config;
 use CrossPeak\WpPest\Config\ValidationException;
+use CrossPeak\WpPest\Runtime\Constants;
 use CrossPeak\WpPest\Support\Process;
 use CrossPeak\WpPest\Support\ProcessRunner;
 
@@ -150,6 +151,7 @@ final class PluginFixture
 
     private function configureWordPress(string $wordpressPath): void
     {
+        file_put_contents($wordpressPath.'/wp-pest-constants.php', "<?php\n".Constants::code($this->config->wordpressConstants())."\n");
         $contentPath = $wordpressPath.DIRECTORY_SEPARATOR.'wp-content';
         $sqlitePath = $contentPath.DIRECTORY_SEPARATOR.'plugins'.DIRECTORY_SEPARATOR.'sqlite-database-integration';
         $dropIn = $contentPath.DIRECTORY_SEPARATOR.'db.php';
@@ -189,6 +191,10 @@ final class PluginFixture
                 $contents = str_replace("define('WP_DEBUG', true);", "define('WP_DEBUG', true);\n{$journal}", $contents);
             }
 
+            $include = "require __DIR__.'/wp-pest-constants.php';";
+            if (! str_contains($contents, $include)) {
+                $contents = str_replace("require_once ABSPATH.'wp-settings.php';", $include."\nrequire_once ABSPATH.'wp-settings.php';", $contents);
+            }
             file_put_contents($config, $contents);
 
             return;
@@ -230,6 +236,7 @@ if (! defined('ABSPATH')) {
     define('ABSPATH', __DIR__.DIRECTORY_SEPARATOR);
 }
 
+require __DIR__.'/wp-pest-constants.php';
 require_once ABSPATH.'wp-settings.php';
 PHP;
 
@@ -322,6 +329,7 @@ PHP;
             'local_sources' => $localSources,
             'activate' => $this->config->activatePlugins(),
             'context' => $this->config->wordpressContext(),
+            'constants' => $this->config->wordpressConstants(),
             'composer' => $composerHash,
             'composer_lock' => is_file($lockFile) ? hash_file('sha256', $lockFile) : null,
         ], JSON_THROW_ON_ERROR));

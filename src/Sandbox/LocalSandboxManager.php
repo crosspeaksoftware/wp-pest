@@ -7,6 +7,7 @@ namespace CrossPeak\WpPest\Sandbox;
 use CrossPeak\WpPest\Config\Config;
 use CrossPeak\WpPest\Config\ValidationException;
 use CrossPeak\WpPest\Matrix\MatrixCombination;
+use CrossPeak\WpPest\Runtime\Constants;
 use CrossPeak\WpPest\Support\Process;
 use CrossPeak\WpPest\Support\ProcessRunner;
 use RuntimeException;
@@ -246,7 +247,7 @@ final class LocalSandboxManager
         }
 
         $databaseDirectory = $wordpress.DIRECTORY_SEPARATOR.'.wp-pest';
-        $extra = $environment['WORDPRESS_CONFIG_EXTRA'] ?? '';
+        $extra = Constants::code($this->config->wordpressConstants())."\n".($environment['WORDPRESS_CONFIG_EXTRA'] ?? '');
         $contents = "<?php\n\ndefine('DB_NAME', 'wp_pest');\ndefine('DB_USER', 'wp_pest');\ndefine('DB_PASSWORD', 'wp_pest');\ndefine('DB_HOST', 'localhost');\ndefine('DB_CHARSET', 'utf8');\ndefine('DB_COLLATE', '');\ndefine('DB_DIR', ".var_export($databaseDirectory, true).");\ndefine('DB_FILE', 'wordpress.sqlite');\ndefine('WP_HOME', ".var_export($url, true).");\ndefine('WP_SITEURL', ".var_export($url, true).");\ndefine('WP_DEFAULT_THEME', 'twentytwentyfive');\ndefine('WP_DEBUG', true);\n".$extra."\n\$table_prefix = 'wp_';\nif (! defined('ABSPATH')) { define('ABSPATH', __DIR__.DIRECTORY_SEPARATOR); }\nrequire_once ABSPATH.'wp-settings.php';\n";
         file_put_contents($config, $contents);
     }

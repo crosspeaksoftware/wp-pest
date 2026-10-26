@@ -16,6 +16,7 @@ return [
     'plugin' => ['path' => '.'],
     'wordpress' => [
         'options' => ['sample_option' => 'configured'],
+        'constants' => ['PLUGIN_TEST_SHARED' => 'same in every process'],
     ],
     'plugins' => [
         'dependencies' => [
@@ -71,6 +72,7 @@ PHP);
         ])
         ->and($contentPath.'/db.php')->toBeFile()
         ->and($fixturePath.'/wordpress/wp-config.php')->toBeFile()
+        ->and(file_get_contents($fixturePath.'/wordpress/wp-pest-constants.php'))->toContain('PLUGIN_TEST_SHARED', 'same in every process')
         ->and($fixturePath.'/prepare.php')->toBeFile()
         ->and($fixturePath.'/finalize.php')->toBeFile()
         ->and($fixturePath.'/configure.php')->toBeFile()

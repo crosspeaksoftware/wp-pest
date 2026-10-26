@@ -64,6 +64,7 @@ it('writes compose files for matrix entries', function (): void {
 
 return [
     'target' => 'plugin',
+    'wordpress' => ['constants' => ['PLUGIN_TEST_SHARED' => 'same in every process']],
     'tests' => ['browser'],
     'plugin' => ['path' => 'plugin'],
     'matrix' => [
@@ -92,6 +93,7 @@ PHP);
             ->and($manager->url('default--wp-7.0.x'))->toBe('http://docker:8091')
             ->and(file_get_contents($path))->toContain("define('WP_DEFAULT_THEME', 'twentytwentyfive');")
             ->and(file_get_contents($path))->toContain('WORDPRESS_DEBUG: "1"', 'WP_DEBUG_LOG')
+            ->and(file_get_contents($path))->toContain('PLUGIN_TEST_SHARED', 'same in every process', '$$wpPestConstantName')
             ->and(file_get_contents($path))->not->toContain('\\/proc\\/')
             ->and(file_get_contents($path))->toContain('"8091:80"')
             ->and(file_get_contents($path))->toContain('/plugin:/var/www/html/wp-content/plugins/plugin-under-test');

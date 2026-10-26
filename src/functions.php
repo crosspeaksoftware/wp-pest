@@ -7,6 +7,7 @@ namespace CrossPeak\WpPest;
 use CrossPeak\WpPest\Browser\WpPage;
 use CrossPeak\WpPest\Runtime\AdminScreen;
 use CrossPeak\WpPest\Runtime\Factory;
+use CrossPeak\WpPest\Runtime\Requirements;
 use CrossPeak\WpPest\Runtime\ResponseCapture;
 use CrossPeak\WpPest\Runtime\SandboxEvaluator;
 use CrossPeak\WpPest\Runtime\ScopedFilter;
@@ -195,4 +196,12 @@ function captureMail(callable $callback): MailRecorder
     }, $callback, PHP_INT_MAX, 2);
 
     return new MailRecorder($messages);
+}
+
+/** Check actual runtime requirements, skipping intentional matrix mismatches.
+ * @param  array<int|string, string|null>  $plugins  Slugs or slug => version comparison pairs.
+ */
+function requireEnvironment(array $plugins = [], ?string $wordpress = null, ?string $php = null, ?string $database = null, string $context = 'auto'): Environment
+{
+    return Requirements::check(wp_pest(), $plugins, $wordpress, $php, $database, $context);
 }

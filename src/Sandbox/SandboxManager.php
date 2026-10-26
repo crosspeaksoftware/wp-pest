@@ -7,6 +7,7 @@ namespace CrossPeak\WpPest\Sandbox;
 use CrossPeak\WpPest\Config\Config;
 use CrossPeak\WpPest\Config\ValidationException;
 use CrossPeak\WpPest\Matrix\MatrixCombination;
+use CrossPeak\WpPest\Runtime\Constants;
 use CrossPeak\WpPest\Support\Process;
 use CrossPeak\WpPest\Support\ProcessRunner;
 
@@ -244,7 +245,7 @@ final class SandboxManager
             'WORDPRESS_DB_USER' => 'wordpress',
             'WORDPRESS_DB_PASSWORD' => 'wordpress',
             'WORDPRESS_DEBUG' => '1',
-            'WORDPRESS_CONFIG_EXTRA' => "define('WP_DEFAULT_THEME', 'twentytwentyfive');\ndefine('WP_DEBUG_LOG', '/proc/1/fd/2');\ndefine('WP_DEBUG_DISPLAY', false);",
+            'WORDPRESS_CONFIG_EXTRA' => Constants::code($this->config->wordpressConstants())."\n"."define('WP_DEFAULT_THEME', 'twentytwentyfive');\ndefine('WP_DEBUG_LOG', '/proc/1/fd/2');\ndefine('WP_DEBUG_DISPLAY', false);",
         ];
         foreach ($entry->env() as $key => $value) {
             if ($key === 'WORDPRESS_CONFIG_EXTRA') {
@@ -258,7 +259,7 @@ final class SandboxManager
 
         $environment = '';
         foreach ($containerEnvironment as $key => $value) {
-            $environment .= "      {$key}: ".json_encode($value, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)."\n";
+            $environment .= "      {$key}: ".json_encode(str_replace('$', '$$', $value), JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)."\n";
         }
 
         $php = $entry->phpVersion();

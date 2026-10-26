@@ -75,7 +75,7 @@ PHP);
     }
 });
 
-it('uses active matrix plugin metadata in browser-only runs', function (): void {
+it('exposes configured plugin metadata separately from observed versions', function (): void {
     file_put_contents($this->workspace.'/tests/wp-pest.php', <<<'PHP'
 <?php
 
@@ -102,10 +102,9 @@ PHP);
     try {
         $runtime = new WpPest((new ConfigLoader)->load($this->workspace), $this->workspace);
 
-        expect($runtime->hasPlugin('sample-addon'))->toBeTrue()
-            ->and($runtime->pluginVersion('sample-plugin'))->toBe('1.2.3')
-            ->and($runtime->pluginVersionIs('sample-plugin', '>=1.2.0'))->toBeTrue()
-            ->and($runtime->pluginVersion('sample-addon'))->toBe('2.4.1');
+        expect($runtime->expectsPlugin('sample-addon'))->toBeTrue()
+            ->and($runtime->configuredPluginVersion('sample-plugin'))->toBe('1.2.3')
+            ->and($runtime->configuredPluginVersion('sample-addon'))->toBe('2.4.1');
     } finally {
         putenv('WP_PEST_MATRIX');
     }

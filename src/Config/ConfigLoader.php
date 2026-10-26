@@ -24,6 +24,7 @@ final class ConfigLoader
                 'version' => '^7.0',
                 'options' => [],
                 'context' => 'front',
+                'constants' => [],
             ],
             'plugin' => [
                 'path' => null,
@@ -176,6 +177,26 @@ final class ConfigLoader
         $cursor[$last] = $value;
     }
 
+    private function validConstantValue(mixed $value): bool
+    {
+        try {
+            json_encode($value, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return false;
+        }
+        if (is_array($value)) {
+            foreach ($value as $item) {
+                if (! $this->validConstantValue($item)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        return $value === null || is_scalar($value);
+    }
+
     /**
      * @param  array<string, mixed>  $config
      */
@@ -227,6 +248,21 @@ final class ConfigLoader
 
         if (! is_bool($config['plugins']['activate'] ?? null)) {
             $errors[] = 'plugins.activate must be a boolean.';
+        }
+
+        $constants = $config['wordpress']['constants'] ?? null;
+        if (! is_array($constants) || ($constants !== [] && array_is_list($constants))) {
+            $errors[] = 'wordpress.constants must be an associative array.';
+        } else {
+            $reserved = ['ABSPATH', 'DB_NAME', 'DB_USER', 'DB_PASSWORD', 'DB_HOST', 'DB_CHARSET', 'DB_COLLATE', 'DB_DIR', 'DB_FILE', 'WP_HOME', 'WP_SITEURL', 'WP_ADMIN', 'WP_INSTALLING', 'WP_CONTENT_DIR', 'WP_PLUGIN_DIR', 'WP_DEFAULT_THEME', 'WP_DEBUG', 'WP_DEBUG_LOG', 'WP_DEBUG_DISPLAY', 'SQLITE_JOURNAL_MODE'];
+            foreach ($constants as $name => $value) {
+                if (! is_string($name) || preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $name) !== 1 || in_array($name, $reserved, true)) {
+                    $errors[] = 'wordpress.constants contains an invalid or framework-managed constant name: '.(string) $name;
+                }
+                if (! $this->validConstantValue($value)) {
+                    $errors[] = 'wordpress.constants values must contain only finite scalars, null, or arrays.';
+                }
+            }
         }
 
         if (! in_array($config['wordpress']['context'] ?? null, ['front', 'admin'], true)) {

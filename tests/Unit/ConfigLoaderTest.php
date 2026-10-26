@@ -172,3 +172,12 @@ it('validates the pre-bootstrap WordPress context', function (): void {
     file_put_contents($this->workspace.'/tests/wp-pest.php', "<?php return ['wordpress' => ['context' => 'ajax']];");
     expect(fn () => (new ConfigLoader)->load($this->workspace))->toThrow(ValidationException::class, 'wordpress.context');
 });
+
+it('validates shared constants without allowing overrides of fixture infrastructure', function () {
+    file_put_contents($this->workspace.'/tests/wp-pest.php', "<?php return ['wordpress' => ['constants' => ['PLUGIN_TEST_KEY' => ['enabled' => true, 'empty' => null]]]];");
+    expect((new ConfigLoader)->load($this->workspace)->wordpressConstants())->toBe(['PLUGIN_TEST_KEY' => ['enabled' => true, 'empty' => null]]);
+    foreach ([['WP_HOME' => 'elsewhere'], ['bad-name' => true], ['X' => new stdClass]] as $constants) {
+        file_put_contents($this->workspace.'/tests/wp-pest.php', '<?php return '.var_export(['wordpress' => ['constants' => $constants]], true).';');
+        expect(fn () => (new ConfigLoader)->load($this->workspace))->toThrow(ValidationException::class, 'wordpress.constants');
+    }
+});

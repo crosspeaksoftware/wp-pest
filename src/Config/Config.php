@@ -102,6 +102,12 @@ final class Config
         return is_array($options) ? $options : [];
     }
 
+    /** @return array<string, mixed> */
+    public function wordpressConstants(): array
+    {
+        return $this->get('wordpress.constants', []);
+    }
+
     public function wordpressContext(): string
     {
         return (string) $this->get('wordpress.context', 'front');

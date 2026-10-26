@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace CrossPeak\WpPest\Runtime;
 
+use Closure;
 use CrossPeak\WpPest\Config\Config;
 use CrossPeak\WpPest\Config\ConfigLoader;
+use CrossPeak\WpPest\Environment;
 use CrossPeak\WpPest\Sandbox\PluginFixture;
 use CrossPeak\WpPest\Sandbox\SandboxManager;
 use CrossPeak\WpPest\Support\SiteDetector;
@@ -27,6 +29,7 @@ final class WpPest
     public function __construct(
         private readonly Config $config,
         private readonly string $workingDirectory,
+        private readonly ?Closure $environmentProbe = null,
     ) {}
 
     public static function fromCurrentWorkingDirectory(): self
@@ -269,21 +272,74 @@ final class WpPest
         return $this->config->activeMatrix()?->all();
     }
 
-    public function phpVersion(): string
+    /** Resolve the conventional Code/Browser test directory, with an explicit override for custom layouts. */
+    public function executionContext(string $context = 'auto'): string
     {
-        return PHP_VERSION;
+        if (! in_array($context, ['auto', 'code', 'browser'], true)) {
+            throw new \InvalidArgumentException('Environment context must be auto, code, or browser.');
+        }
+        if ($context !== 'auto') {
+            return $context;
+        }
+        foreach (debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS) as $frame) {
+            $file = str_replace('\\', '/', $frame['file'] ?? '');
+            if (preg_match('~/tests/(Code|Browser)/~i', $file, $matches) === 1) {
+                return strtolower($matches[1]);
+            }
+        }
+
+        return $this->shouldBootstrapWordPress() ? 'code' : 'browser';
+    }
+
+    /** Read the running instance every time; activation state may change during a test. */
+    public function environment(string $context = 'auto'): Environment
+    {
+        $context = $this->executionContext($context);
+        if ($this->environmentProbe !== null) {
+            $data = ($this->environmentProbe)($context);
+        } elseif ($context === 'code') {
+            $data = require __DIR__.'/environment.php';
+        } else {
+            if ($this->target() !== 'plugin') {
+                throw new RuntimeException('Remote site runtime inspection requires a plugin sandbox. Use code context for a locally bootstrapped site.');
+            }
+            $source = file_get_contents(__DIR__.'/environment.php');
+            if ($source === false) {
+                throw new RuntimeException('Unable to load the WordPress environment probe.');
+            }
+            $data = (new SandboxEvaluator($this->wpCli(...)))->evaluate(substr($source, 5));
+        }
+        $plugins = $data['plugins'];
+        foreach ($this->config->dependencyPlugins() as $index => $dependency) {
+            $directory = $context === 'browser' && $dependency->isLocalPath() ? 'dependency-'.$index : $dependency->slug();
+            if (isset($plugins[$directory])) {
+                $plugins[$dependency->slug()] = $plugins[$directory];
+            }
+        }
+        if ($this->pluginPath() !== null && isset($plugins['plugin-under-test'])) {
+            $plugins[basename(realpath($this->pluginPath()) ?: $this->pluginPath())] = $plugins['plugin-under-test'];
+        }
+
+        return new Environment($data['php'], $data['wordpress'], $data['database'], $data['database_version'], $plugins);
+    }
+
+    public function phpVersion(string $context = 'auto'): string
+    {
+        return $this->executionContext($context) === 'code' ? PHP_VERSION : $this->environment('browser')->php;
     }
 
     public function phpVersionIs(string $constraint): bool
     {
-        return $this->versionIs(PHP_VERSION, $constraint);
+        return $this->versionIs($this->phpVersion(), $constraint);
     }
 
     public function wordpressVersion(): ?string
     {
-        $getBlogInfo = 'get_bloginfo';
+        if ($this->executionContext() === 'code' && $this->environmentProbe === null && ! function_exists('get_option')) {
+            return null;
+        }
 
-        return function_exists($getBlogInfo) ? (string) $this->callFunction($getBlogInfo, 'version') : null;
+        return $this->environment()->wordpress;
     }
 
     public function wordpressVersionIs(string $constraint): bool
@@ -295,26 +351,43 @@ final class WpPest
 
     public function hasPlugin(string $slug): bool
     {
-        $slug = $this->normalizeSlug($slug);
-        foreach ($this->config->dependencyPlugins() as $plugin) {
-            if ($plugin->slug() === $slug) {
-                return true;
-            }
-        }
-
-        return false;
+        return $this->environment()->hasPlugin($this->normalizeSlug($slug));
     }
 
     public function pluginVersion(string $slug): ?string
     {
+        return $this->environment()->pluginVersion($this->normalizeSlug($slug));
+    }
+
+    public function databaseType(string $context = 'auto'): string
+    {
+        return $this->environment($context)->database;
+    }
+
+    public function expectsPlugin(string $slug): bool
+    {
+        return $this->configuredPluginVersion($slug) !== null;
+    }
+
+    public function configuredPluginVersion(string $slug): ?string
+    {
         $slug = $this->normalizeSlug($slug);
         foreach ($this->config->dependencyPlugins() as $plugin) {
             if ($plugin->slug() === $slug) {
-                return $plugin->version() === '*' ? null : $plugin->version();
+                return $plugin->version();
             }
         }
 
         return null;
+    }
+
+    public function assertExpectedPlugins(Environment $environment): void
+    {
+        foreach ($this->config->dependencyPlugins() as $dependency) {
+            if (! $environment->hasPlugin($dependency->slug())) {
+                throw new RuntimeException('Configured dependency is missing or inactive in the running WordPress instance: '.$dependency->slug());
+            }
+        }
     }
 
     public function pluginVersionIs(string $slug, string $constraint): bool
@@ -353,6 +426,7 @@ final class WpPest
             }
         }
 
+        Constants::apply($this->config->wordpressConstants());
         require_once $wpLoad;
 
         // Load once before per-test state snapshots, so admin API hooks stay
@@ -361,6 +435,7 @@ final class WpPest
 
         $this->configureSqlite();
         $this->applyWordpressOptions();
+        $this->assertExpectedPlugins($this->environment('code'));
 
         return true;
     }
@@ -466,21 +541,9 @@ final class WpPest
         }
     }
 
-    private function callFunction(string $name, mixed ...$arguments): mixed
-    {
-        return (new \ReflectionFunction($name))->invokeArgs($arguments);
-    }
-
     private function versionIs(string $version, string $constraint): bool
     {
-        if (preg_match('/^(>=|<=|!=|==|>|<|=)?\s*(.+)$/', trim($constraint), $matches) !== 1) {
-            return false;
-        }
-
-        $operator = $matches[1] === '' ? '==' : $matches[1];
-        $operator = $operator === '=' ? '==' : $operator;
-
-        return version_compare($version, $matches[2], $operator);
+        return VersionConstraint::matches($version, $constraint);
     }
 
     private function normalizeSlug(string $slug): string

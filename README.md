@@ -549,6 +549,91 @@ original callback registry, including priorities and accepted argument counts,
 even after nested scopes or exceptions. Changes to other hooks remain intact.
 These are in-process Code-test helpers; browser requests run in another process.
 
+## Shared configuration and runtime requirements
+
+Define plugin test constants once in `tests/wp-pest.php`:
+
+```php
+'wordpress' => [
+    'constants' => [
+        'MY_PLUGIN_TEST_KEY' => 'test-key',
+        'MY_PLUGIN_FEATURE_ENABLED' => true,
+    ],
+],
+```
+
+They are defined before plugin loading in Code tests, fixture installation and
+activation, local browser sandboxes, and Docker's WordPress/WP-CLI containers.
+Remove duplicate definitions from `tests/Pest.php` and `WORDPRESS_CONFIG_EXTRA`.
+A pre-existing definition with the same value is accepted; a different value fails
+with the constant's name, without printing its value. Changing constants invalidates
+the prepared fixture so activation and deferred setup use the new configuration.
+Values may be finite scalars, null, or arrays of those values. Framework-managed
+constants such as `ABSPATH`, `DB_NAME`, `WP_HOME`, `WP_ADMIN`, and debug settings
+cannot be overridden through this map; use the corresponding framework settings.
+Code tests against an existing site apply constants before loading its `wp-load.php`
+and do not modify that site's configuration file. Constants cannot change later in
+the same PHP process.
+
+Inspect the environment a test actually uses:
+
+```php
+$environment = wp_pest()->environment();
+$environment->php;
+$environment->wordpress;
+$environment->database;        // sqlite, mysql, or mariadb
+$environment->databaseVersion;
+$environment->hasPlugin('gravityforms');
+$environment->pluginVersion('gravityforms');
+```
+
+The existing `phpVersion()`, `wordpressVersion()`, `hasPlugin()`, and
+`pluginVersion()` runtime helpers now use actual runtime data. `hasPlugin()` means
+active, and `pluginVersion()` reads the installed plugin's Version header (also
+available for inactive plugins). Neither method guesses from the configured version
+constraint. `expectsPlugin()` and `configuredPluginVersion()` expose configuration
+when planning a matrix run before WordPress starts; `matrix()` remains configuration
+metadata. The plugin under test is available as `plugin-under-test` or its source
+directory's basename. Local dependency mount names are mapped back to configured slugs.
+
+Code tests inspect the bootstrapped WordPress process. Browser tests query the
+sandbox through WP-CLI, including its PHP version rather than Pest's PHP version.
+Conventional `tests/Code` and `tests/Browser` call paths are detected independently,
+so mixed runs use the right process for each test. For a custom directory layout,
+use `environment('code')` / `environment('browser')` or pass `context` to the
+requirements helper. Outside a test, selection falls back to the requested suites.
+Each inspection is fresh; an `Environment` object is a snapshot. Browser inspection
+is available for managed plugin sandboxes; a remote site URL alone cannot expose
+PHP, database, or plugin metadata and produces an explicit error.
+
+Declare requirements at the beginning of a test, or in `beforeEach()` for a file:
+
+```php
+use function CrossPeak\WpPest\requireEnvironment;
+
+beforeEach(function () {
+    requireEnvironment(
+        plugins: ['gravityformspartialentries', 'gravityforms' => '>=2.10.3'],
+        wordpress: '>=6.9',
+        php: '>=8.4',
+        database: 'mysql',
+    );
+});
+```
+
+The helper returns the observed `Environment`. Requirements accept a single version
+comparison (`>=`, `>`, `<=`, `<`, `!=`, `=`, `==`, or an exact version); Composer-style
+ranges such as `^6.9` are deliberately rejected rather than interpreted as a version.
+`mysql` accepts both MySQL and MariaDB; `mariadb` and `sqlite` match exactly.
+
+An optional plugin absent from the selected profile, an incompatible version, or a
+different database causes a skip with the actual environment in the reason. A
+configured dependency missing or inactive causes a setup error before any skips.
+Code bootstrap also validates configured dependencies. An active plugin with no
+Version header causes an error when a version requirement is specified. These
+checks verify WordPress activation and installed headers; tests still need to
+verify any plugin-specific service or feature initialization.
+
 ## CI overrides
 
 - `WP_PEST_TARGET`
