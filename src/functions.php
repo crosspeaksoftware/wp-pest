@@ -56,22 +56,22 @@ function wpEvalFile(string $path, array $arguments = []): mixed
  *
  * @throws LogicException When Pest Browser is unavailable or no site URL is configured.
  */
-function actingAsAdmin(): WpPage
+function loginAsAdmin(): WpPage
 {
     if (! class_exists(Configuration::class)) {
-        throw new LogicException('actingAsAdmin() requires pestphp/pest-plugin-browser.');
+        throw new LogicException('loginAsAdmin() requires pestphp/pest-plugin-browser.');
     }
 
     $runtime = wp_pest();
 
     if ($runtime->target() !== 'plugin') {
-        throw new LogicException('actingAsAdmin() is only available for wp-pest plugin browser sandboxes.');
+        throw new LogicException('loginAsAdmin() is only available for wp-pest plugin browser sandboxes.');
     }
 
     $url = $runtime->url();
 
     if ($url === null || $url === '') {
-        throw new LogicException('actingAsAdmin() requires an active WordPress browser URL.');
+        throw new LogicException('loginAsAdmin() requires an active WordPress browser URL.');
     }
 
     $visit = 'visit';
@@ -151,4 +151,28 @@ function interceptWpDie(callable $callback): mixed
 function captureAjax(callable $callback): AjaxResponse
 {
     return ResponseCapture::ajax($callback);
+}
+
+/** Compatibility alias for browser login. Prefer loginAsAdmin(). */
+function actingAsAdmin(): WpPage
+{
+    return loginAsAdmin();
+}
+
+/** Authenticate an existing user in the code-test process. */
+function actingAs(int|object $user): int
+{
+    return wp_pest()->actingAs($user);
+}
+
+/** Create and authenticate a user with an installed WordPress role. */
+function actingAsRole(string $role): int
+{
+    return wp_pest()->actingAsRole($role);
+}
+
+/** Clear the current code-test user. */
+function actingAsGuest(): void
+{
+    wp_pest()->actingAsGuest();
 }

@@ -62,21 +62,54 @@ final class WpPest
         return $this->factory ??= new Factory;
     }
 
-    public function actingAsAdministrator(): int
+    public function actingAs(int|object $user): int
     {
         if (! function_exists('wp_set_current_user') || ! function_exists('get_user_by')) {
             throw new RuntimeException('WordPress must be bootstrapped before authenticating users.');
         }
+        if (is_object($user) && ! is_a($user, 'WP_User')) {
+            throw new \InvalidArgumentException('actingAs() expects a user ID or WP_User.');
+        }
+        $id = is_int($user) ? $user : (int) (get_object_vars($user)['ID'] ?? 0);
+        if ($id <= 0 || ! get_user_by('id', $id)) {
+            throw new \InvalidArgumentException('The requested WordPress user does not exist.');
+        }
+        wp_set_current_user($id);
 
+        return $id;
+    }
+
+    public function actingAsRole(string $role): int
+    {
+        if (! function_exists('get_role')) {
+            throw new RuntimeException('WordPress must be bootstrapped before authenticating users.');
+        }
+        if (get_role($role) === null) {
+            throw new \InvalidArgumentException('Unknown WordPress role: '.$role);
+        }
+
+        return $this->actingAs($this->factory()->user->create(['role' => $role]));
+    }
+
+    public function actingAsGuest(): void
+    {
+        if (! function_exists('wp_set_current_user')) {
+            throw new RuntimeException('WordPress must be bootstrapped before authenticating users.');
+        }
+        wp_set_current_user(0);
+    }
+
+    public function actingAsAdministrator(): int
+    {
+        if (! function_exists('get_user_by')) {
+            throw new RuntimeException('WordPress must be bootstrapped before authenticating users.');
+        }
         $administrator = get_user_by('login', 'admin');
-        $administratorId = is_object($administrator) ? (get_object_vars($administrator)['ID'] ?? null) : null;
-        $userId = is_int($administratorId)
-            ? $administratorId
-            : $this->factory()->user->create(['role' => 'administrator']);
+        if (is_object($administrator) && in_array('administrator', $administrator->roles, true)) {
+            return $this->actingAs($administrator);
+        }
 
-        wp_set_current_user($userId);
-
-        return $userId;
+        return $this->actingAsRole('administrator');
     }
 
     public function shouldBootstrapWordPress(): bool

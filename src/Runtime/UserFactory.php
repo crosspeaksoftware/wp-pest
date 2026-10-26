@@ -6,7 +6,7 @@ namespace CrossPeak\WpPest\Runtime;
 
 use RuntimeException;
 
-final class UserFactory
+final class UserFactory extends RecordFactory
 {
     /**
      * @param  array<string, mixed>  $attributes
@@ -31,5 +31,14 @@ final class UserFactory
         }
 
         return (int) $userId;
+    }
+
+    protected function get(int $id): object
+    {
+        if (! function_exists('get_user_by') || ! is_object($user = get_user_by('id', $id))) {
+            throw new RuntimeException('WordPress could not retrieve the created user.');
+        }
+
+        return $user;
     }
 }

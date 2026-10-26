@@ -87,7 +87,7 @@ This is useful for seeding browser fixtures and inspecting raw WordPress or plug
 For browser tests, wp-pest also provides namespaced helpers for the common sandbox operations:
 
 ```php
-use function CrossPeak\WpPest\{actingAsAdmin, wpEval};
+use function CrossPeak\WpPest\{loginAsAdmin, wpEval};
 
 $form = wpEval(<<<'PHP'
 $form_id = GFAPI::add_form(['title' => 'Test Form']);
@@ -102,7 +102,7 @@ return ['form_id' => $form_id, 'path' => wp_make_link_relative(get_permalink($pa
 PHP);
 
 visit($form['path'])->assertSee('Test Form');
-actingAsAdmin()->navigate('/wp-admin/plugins.php')->assertSee('Plugins');
+loginAsAdmin()->navigate('/wp-admin/plugins.php')->assertSee('Plugins');
 ```
 
 Pass data separately from PHP source; it is exposed as `$args` inside the sandbox:
@@ -153,7 +153,7 @@ Use arrays and scalar values rather than PHP services or closures. Resources,
 recursive data, non-finite numbers, and invalid UTF-8 produce JSON encoding errors. Fixture output and plugin output are ignored around the
 returned result. Existing single-argument `wpEval($code)` calls remain supported.
 
-`wpEval()` runs the provided PHP body in the active plugin sandbox with `$wpdb` available and returns its JSON-compatible result. The WordPress site runs in a separate Docker/PHP process, unlike a Laravel app booted inside Pest's process, so WordPress objects and services cannot be used directly in the test process. `wpEval()` and `wpEvalFile()` are the RPC boundary for setup and inspection; keep returned values JSON-compatible and use `wp_pest()->wpCli()` when full WP-CLI output or a non-PHP CLI command is needed. `actingAsAdmin()` is limited to plugin browser sandboxes, logs in with the seeded `admin` / `password` account, and returns a relative-navigation-aware browser page for chaining. These helpers require the optional Pest Browser plugin when used.
+`wpEval()` runs the provided PHP body in the active plugin sandbox with `$wpdb` available and returns its JSON-compatible result. The WordPress site runs in a separate Docker/PHP process, unlike a Laravel app booted inside Pest's process, so WordPress objects and services cannot be used directly in the test process. `wpEval()` and `wpEvalFile()` are the RPC boundary for setup and inspection; keep returned values JSON-compatible and use `wp_pest()->wpCli()` when full WP-CLI output or a non-PHP CLI command is needed. `loginAsAdmin()` is limited to plugin browser sandboxes, logs in with the seeded `admin` / `password` account, and returns a relative-navigation-aware browser page for chaining. These helpers require the optional Pest Browser plugin when used.
 
 For plugin Code tests, the first run creates a real WordPress fixture under `<system-temp>/wp-pest-<project-hash>/fixtures`, backed by the WordPress SQLite integration so no external database service is required. Fixtures are cached separately for each project outside the plugin source tree, so symlinked plugins cannot cause WordPress to misidentify dependency paths. System temporary-directory cleanup may evict this cache; the next run recreates it. Existing `.wp-pest/fixtures` directories are no longer used and may be removed. The fixture installs Twenty Twenty-Five from WordPress.org as its default theme, WordPress is installed, and the plugin under test is loaded before the Code suite runs.
 
@@ -321,7 +321,7 @@ wp_pest()->pluginVersion('gravityforms');
 wp_pest()->pluginVersionIs('gravityforms', '>=2.10.5');
 wp_pest()->bootstrapWordPress(); // manual fallback for custom runners
 wp_pest()->factory()->user->create(['role' => 'editor']);
-wp_pest()->actingAsAdministrator();
+wp_pest()->loginAsAdministrator();
 ```
 
 Plugin fixtures can enforce WordPress options before the test process loads its
@@ -340,13 +340,13 @@ or a previous test changes an option value:
 The same code-test helpers are available as namespaced functions:
 
 ```php
-use function CrossPeak\WpPest\{actingAsAdministrator, factory};
+use function CrossPeak\WpPest\{loginAsAdministrator, factory};
 
 $customerId = factory()->user->create(['role' => 'customer']);
-$administratorId = actingAsAdministrator();
+$administratorId = loginAsAdministrator();
 ```
 
-For Pest-style helpers, import `CrossPeak\WpPest\actingAsAdmin` and `CrossPeak\WpPest\wpEval` as shown above.
+For Pest-style helpers, import `CrossPeak\WpPest\loginAsAdmin` and `CrossPeak\WpPest\wpEval` as shown above.
 
 These Boolean helpers make version- or dependency-specific skips straightforward:
 
@@ -360,6 +360,55 @@ test('integrates with Gravity Forms', function (): void {
 });
 ```
 
+## Data factories and authentication
+
+Factories create real WordPress records and return IDs. Each factory supports
+`createAndGet()` for a WordPress object and `createMany($count, $attributes)` for a
+list of IDs. Attributes override the defaults:
+
+```php
+use function CrossPeak\WpPest\{factory, actingAs, actingAsRole, actingAsGuest};
+
+$post = factory()->post->createAndGet(['post_title' => 'Private submission']);
+$pageId = factory()->page->create(['post_content' => '[my-form]']);
+$draftIds = factory()->post->createMany(3, ['post_status' => 'draft']);
+$tagId = factory()->term->create(['taxonomy' => 'post_tag', 'name' => 'Encrypted']);
+$user = factory()->user->createAndGet(['role' => 'editor']);
+$attachmentId = factory()->attachment->create(['post_parent' => $post->ID]);
+
+actingAs($user); // Accepts an existing WP_User or user ID.
+actingAsRole('subscriber'); // Creates a new user with an installed role.
+actingAsGuest();
+```
+
+Posts/pages default to published records; attachment records default to `inherit`
+and `text/plain`; terms default to `category`; users default to `subscriber`.
+Post/page/attachment attributes are raw values: do not call `wp_slash()` on them.
+Bulk creation gives each record unique defaults; explicitly duplicated unique
+attributes (such as user logins) still produce WordPress errors. Negative counts,
+unknown authentication roles, and nonexistent users are rejected.
+
+For a real attachment file, copy a readable fixture into WordPress uploads:
+
+```php
+$id = factory()->attachment->createFromFile(__DIR__.'/fixtures/photo.png', [
+    'post_parent' => $post->ID,
+]);
+$this->deferCleanup(static fn () => wp_delete_attachment($id, true));
+```
+
+The original fixture is preserved. WordPress generates attachment metadata; register
+cleanup before the database rollback so uploaded files and generated image sizes
+are deleted too. Database transactions alone cannot remove files. Creating an
+attachment with `create()` only makes a record and does not copy a file.
+
+Use `actingAs()`, `actingAsRole()`, and `actingAsGuest()` for Code tests. The existing
+`actingAsAdministrator()` still reuses a seeded administrator or creates one; an
+account merely named `admin` is never treated as privileged without that role.
+Use `loginAsAdmin()` for Browser tests. The older browser name `actingAsAdmin()`
+remains an alias, so existing suites keep working. Code-test users and factories
+operate in Pest's process, not the separate browser sandbox.
+
 ## Admin screens and responses
 
 Code-test bootstrap loads the WordPress admin APIs before test isolation starts.
@@ -367,9 +416,9 @@ Tests can use screens, templates, menus, and the base list table without manuall
 requiring admin include files.
 
 ```php
-use function CrossPeak\WpPest\{actingAsAdministrator, captureOutput, onAdminScreen};
+use function CrossPeak\WpPest\{loginAsAdministrator, captureOutput, onAdminScreen};
 
-actingAsAdministrator();
+loginAsAdministrator();
 onAdminScreen('dashboard'); // Lasts until WordPressTestCase restores state.
 $html = captureOutput(fn () => render_my_settings_page());
 expect($html)->toContain('Settings');

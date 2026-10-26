@@ -164,7 +164,7 @@ it('explains that actingAsAdmin requires the optional Pest Browser plugin', func
         $this->markTestSkipped('Pest Browser is installed in this environment.');
     }
 
-    expect(actingAsAdmin(...))->toThrow(LogicException::class, 'actingAsAdmin() requires pestphp/pest-plugin-browser.');
+    expect(actingAsAdmin(...))->toThrow(LogicException::class, 'loginAsAdmin() requires pestphp/pest-plugin-browser.');
 });
 
 it('does not roll back an existing PDO transaction when starting isolation', function (): void {
