@@ -165,3 +165,10 @@ it('applies environment overrides', function (): void {
         putenv('WP_PEST_PLUGIN_PATH');
     }
 });
+
+it('validates the pre-bootstrap WordPress context', function (): void {
+    file_put_contents($this->workspace.'/tests/wp-pest.php', "<?php return ['wordpress' => ['context' => 'admin']];");
+    expect((new ConfigLoader)->load($this->workspace)->wordpressContext())->toBe('admin');
+    file_put_contents($this->workspace.'/tests/wp-pest.php', "<?php return ['wordpress' => ['context' => 'ajax']];");
+    expect(fn () => (new ConfigLoader)->load($this->workspace))->toThrow(ValidationException::class, 'wordpress.context');
+});

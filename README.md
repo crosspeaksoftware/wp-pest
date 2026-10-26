@@ -360,6 +360,86 @@ test('integrates with Gravity Forms', function (): void {
 });
 ```
 
+## Admin screens and responses
+
+Code-test bootstrap loads the WordPress admin APIs before test isolation starts.
+Tests can use screens, templates, menus, and the base list table without manually
+requiring admin include files.
+
+```php
+use function CrossPeak\WpPest\{actingAsAdministrator, captureOutput, onAdminScreen};
+
+actingAsAdministrator();
+onAdminScreen('dashboard'); // Lasts until WordPressTestCase restores state.
+$html = captureOutput(fn () => render_my_settings_page());
+expect($html)->toContain('Settings');
+
+// A callback scopes the screen to this operation and returns the callback result.
+$html = onAdminScreen('settings_page_my_plugin', fn () =>
+    captureOutput(fn () => render_my_settings_page())
+);
+```
+
+`onAdminScreen()` restores the previous screen, post type, and taxonomy after a
+scoped callback, including when it throws. It does not authenticate a user or fire
+`admin_init`, `admin_menu`, or `load-*` actions; invoke the lifecycle actions your
+test needs explicitly. `captureOutput()` ignores the callback's return value,
+collects printed output, and discards it on failure while closing nested removable
+buffers. Callbacks should leave the helper's buffer and the caller's buffers intact.
+
+If a plugin checks `is_admin()` while loading, select the context in
+`tests/wp-pest.php`:
+
+```php
+'wordpress' => [
+    'context' => 'admin', // Default: 'front'. Applies to Code tests.
+],
+```
+
+This defines `WP_ADMIN` before plugins load, including during fixture preparation.
+The choice lasts for the PHP process; run front-end and admin bootstrap tests in
+separate processes/configurations. Selecting a screen later cannot rerun plugin
+initialization. Browser requests select their context through WordPress normally.
+
+Capture callbacks that call `wp_send_json_success()`, `wp_send_json_error()`, or
+`wp_die()` without terminating Pest:
+
+```php
+use CrossPeak\WpPest\WpDieException;
+use function CrossPeak\WpPest\{captureAjax, interceptWpDie};
+
+$response = captureAjax(fn () => my_ajax_handler());
+expect($response->json())->toBe(['success' => true, 'data' => ['saved' => true]])
+    ->and($response->status)->toBe(200);
+
+$response = captureAjax(fn () => wp_die(-1, '', ['response' => 403]));
+expect($response->output)->toBe('-1')->and($response->status)->toBe(403);
+
+expect(fn () => interceptWpDie(fn () => my_nonce_protected_action()))
+    ->toThrow(WpDieException::class);
+```
+
+`captureAjax()` temporarily makes `wp_doing_ajax()` true and intercepts WordPress
+termination handlers. The response exposes `output`, `status`, and `termination`
+(the `WpDieException`, or `null` when the callback returns normally). `json()`
+strictly decodes the body and throws `JsonException` for malformed JSON.
+Status defaults to 200 and observes WordPress's `status_header()` and `wp_die()`
+response arguments. When PHP has already sent headers, WordPress may skip setting
+a JSON response's status; these are callback tests, not HTTP requests.
+
+The exception preserves the original `wpMessage`, `title`, and `arguments`;
+`getMessage()` provides a readable message, including for `WP_Error` values.
+`interceptWpDie()` throws this exception to the test. `captureAjax()` catches it
+and records the AJAX body. Nonterminating calls with `exit => false` continue
+through the original handler. Other exceptions propagate normally.
+
+Temporary hooks, output buffers, headers, and the HTTP status are restored on exit,
+including nested captures and failures (PHP headers can only be restored before
+they are sent). No immutable AJAX/admin constants are set by these scoped helpers.
+They do not dispatch an action, modify request data, or bypass nonce/capability
+checks; prepare the request and user explicitly. A direct `exit` or `die` outside
+`wp_die()` still terminates the process.
+
 ## CI overrides
 
 - `WP_PEST_TARGET`

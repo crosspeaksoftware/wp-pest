@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace CrossPeak\WpPest;
 
 use CrossPeak\WpPest\Browser\WpPage;
+use CrossPeak\WpPest\Runtime\AdminScreen;
 use CrossPeak\WpPest\Runtime\Factory;
+use CrossPeak\WpPest\Runtime\ResponseCapture;
 use CrossPeak\WpPest\Runtime\SandboxEvaluator;
 use JsonException;
 use LogicException;
@@ -105,4 +107,48 @@ function factory(): Factory
 function actingAsAdministrator(): int
 {
     return wp_pest()->actingAsAdministrator();
+}
+
+/** Capture printed output, closing any buffers opened by the callback on failure. */
+function captureOutput(callable $callback): string
+{
+    $level = ob_get_level();
+    ob_start();
+    try {
+        $callback();
+        while (ob_get_level() > $level + 1) {
+            if (! ob_end_flush()) {
+                throw new RuntimeException('The callback opened an output buffer that cannot be removed.');
+            }
+        }
+        if (ob_get_level() !== $level + 1) {
+            throw new RuntimeException('The callback closed the captureOutput() buffer.');
+        }
+
+        return (string) ob_get_contents();
+    } finally {
+        while (ob_get_level() > $level) {
+            if (! ob_end_clean()) {
+                break;
+            }
+        }
+    }
+}
+
+/** Set an admin screen for this test, or restore it after the supplied callback. */
+function onAdminScreen(string $screen, ?callable $callback = null): mixed
+{
+    return AdminScreen::run($screen, $callback);
+}
+
+/** Run a callback with terminating wp_die() calls converted to WpDieException. */
+function interceptWpDie(callable $callback): mixed
+{
+    return ResponseCapture::intercept($callback);
+}
+
+/** Capture an AJAX callback's output, JSON, status, and wp_die() termination. */
+function captureAjax(callable $callback): AjaxResponse
+{
+    return ResponseCapture::ajax($callback);
 }

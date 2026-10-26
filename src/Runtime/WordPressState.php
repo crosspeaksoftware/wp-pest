@@ -13,7 +13,7 @@ final class WordPressState
         '_GET', '_POST', '_REQUEST', '_FILES', '_COOKIE', '_SERVER',
         'wp_filter', 'wp_actions', 'wp_filters', 'wp_current_filter',
         'current_user', 'user_ID', 'userdata', 'user_login', 'user_email',
-        'user_level', 'user_identity', 'current_screen', 'authordata', 'post',
+        'user_level', 'user_identity', 'current_screen', 'typenow', 'taxnow', 'hook_suffix', 'authordata', 'post',
         'wp_query', 'wp_the_query', 'wp', 'wp_scripts', 'wp_styles',
         'menu', 'submenu', 'admin_page_hooks', '_registered_pages', '_parent_pages',
     ];

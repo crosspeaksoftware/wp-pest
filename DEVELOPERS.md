@@ -22,3 +22,8 @@ regression suite with `composer test:integration`; the first run installs a smal
 WordPress fixture through Composer and needs network access. The integration suite
 checks database rollback through the SQLite adapter, request-state restoration,
 cleanup callbacks, and dependency basenames/URLs with a symlinked plugin.
+
+To check plugins that branch on `is_admin()` during bootstrap, run the integration
+suite a second time with `WP_PEST_INTEGRATION_CONTEXT=admin composer test:integration`.
+The fixture plugin records its context at load time so the suite verifies both
+bootstrap behavior and scoped admin/AJAX helpers against WordPress itself.

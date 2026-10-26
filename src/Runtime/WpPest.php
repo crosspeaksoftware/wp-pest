@@ -310,7 +310,21 @@ final class WpPest
             return false;
         }
 
+        if ($this->config->wordpressContext() === 'admin') {
+            if ((defined('WP_ADMIN') && ! WP_ADMIN)
+                || (! defined('WP_ADMIN') && function_exists('wp_set_current_user'))) {
+                throw new RuntimeException('Admin context must be selected before WordPress is bootstrapped.');
+            }
+            if (! defined('WP_ADMIN')) {
+                define('WP_ADMIN', true);
+            }
+        }
+
         require_once $wpLoad;
+
+        // Load once before per-test state snapshots, so admin API hooks stay
+        // available after teardown restores the initial WordPress hook registry.
+        AdminScreen::load();
 
         $this->configureSqlite();
         $this->applyWordpressOptions();

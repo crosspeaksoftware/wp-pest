@@ -102,6 +102,11 @@ final class Config
         return is_array($options) ? $options : [];
     }
 
+    public function wordpressContext(): string
+    {
+        return (string) $this->get('wordpress.context', 'front');
+    }
+
     /** @return list<PluginDependency> */
     public function baseDependencyPlugins(): array
     {

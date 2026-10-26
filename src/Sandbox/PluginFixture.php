@@ -321,6 +321,7 @@ PHP;
             'plugins' => $pluginFiles,
             'local_sources' => $localSources,
             'activate' => $this->config->activatePlugins(),
+            'context' => $this->config->wordpressContext(),
             'composer' => $composerHash,
             'composer_lock' => is_file($lockFile) ? hash_file('sha256', $lockFile) : null,
         ], JSON_THROW_ON_ERROR));
@@ -356,10 +357,12 @@ PHP;
         $plugins = var_export($pluginFiles, true);
         $options = var_export($this->config->wordpressOptions(), true);
         $activate = $this->config->activatePlugins() ? 'true' : 'false';
+        $context = $this->config->wordpressContext() === 'admin' ? "define('WP_ADMIN', true);" : '';
         $contents = <<<PHP
 <?php
 
 putenv('WP_PEST_INSTALLING=1');
+{$context}
 require {$wpLoad};
 
 require_once ABSPATH.'wp-admin/includes/upgrade.php';
@@ -424,6 +427,7 @@ PHP;
 <?php
 
 define('WP_DEBUG_DISPLAY', false);
+{$context}
 require {$wpLoad};
 PHP;
         file_put_contents($finalizeScript, $finalizeContents.PHP_EOL);

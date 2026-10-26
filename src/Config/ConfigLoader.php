@@ -23,6 +23,7 @@ final class ConfigLoader
             'wordpress' => [
                 'version' => '^7.0',
                 'options' => [],
+                'context' => 'front',
             ],
             'plugin' => [
                 'path' => null,
@@ -226,6 +227,10 @@ final class ConfigLoader
 
         if (! is_bool($config['plugins']['activate'] ?? null)) {
             $errors[] = 'plugins.activate must be a boolean.';
+        }
+
+        if (! in_array($config['wordpress']['context'] ?? null, ['front', 'admin'], true)) {
+            $errors[] = 'wordpress.context must be "front" or "admin".';
         }
 
         $options = $config['wordpress']['options'] ?? null;
