@@ -208,7 +208,7 @@ PHP);
     $runWithoutSockets = static function (array $arguments) use ($workspace): array {
         $autoload = dirname(__DIR__, 2).'/vendor/autoload.php';
         $script = 'require '.var_export($autoload, true).'; chdir('.var_export($workspace, true).'); exit((new \\CrossPeak\\WpPest\\Cli\\Application)->run('.var_export(['wp-pest', ...$arguments], true).'));';
-        exec(escapeshellarg(PHP_BINARY).' -n -r '.escapeshellarg($script).' 2>&1', $output, $exitCode);
+        exec(escapeshellarg(PHP_BINARY).' -n -d disable_functions=socket_create_listen -r '.escapeshellarg($script).' 2>&1', $output, $exitCode);
 
         return [$exitCode, implode("\n", $output)];
     };
@@ -237,7 +237,7 @@ PHP);
 
     $autoload = dirname(__DIR__, 2).'/vendor/autoload.php';
     $script = 'require '.var_export($autoload, true).'; chdir('.var_export($this->workspace, true).'); exit((new \\CrossPeak\\WpPest\\Cli\\Application)->run(["wp-pest", "run", "--tests=code"]));';
-    exec(escapeshellarg(PHP_BINARY).' -n -r '.escapeshellarg($script).' 2>&1', $output, $exitCode);
+    exec(escapeshellarg(PHP_BINARY).' -n -d disable_functions=socket_create_listen -r '.escapeshellarg($script).' 2>&1', $output, $exitCode);
 
     expect($exitCode)->toBe(0)
         ->and(implode("\n", $output))->not->toContain('socket_create_listen()');

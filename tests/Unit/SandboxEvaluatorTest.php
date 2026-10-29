@@ -13,7 +13,14 @@ beforeEach(function (): void {
         $bootstrap = 'define("WP_PLUGIN_DIR", '.$plugins.'); $wpdb = (object) ["prefix" => "wp_"];';
         $bootstrap .= 'echo "plugin bootstrap output"; register_shutdown_function(static function () { echo "shutdown output"; });';
 
-        return (new Process)->capture([PHP_BINARY, '-r', $bootstrap.$command[1]]);
+        // Match WP-CLI's stderr diagnostics regardless of the host php.ini settings.
+        return (new Process)->capture([
+            PHP_BINARY,
+            '-d', 'display_errors=stderr',
+            '-d', 'log_errors=0',
+            '-d', 'error_reporting=-1',
+            '-r', $bootstrap.$command[1],
+        ]);
     });
 });
 
